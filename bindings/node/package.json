@@ -1,6 +1,6 @@
 {
   "name": "@0xdoublesharp/bin-packing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node.js bindings for the 0xdoublesharp bin-packing optimizer",
   "license": "MIT",
   "packageManager": "pnpm@10.25.0",

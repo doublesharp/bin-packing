@@ -1,6 +1,6 @@
 {
   "name": "@0xdoublesharp/bin-packing-wasm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "WebAssembly bindings for the bin-packing cut list optimizer (browser, Node.js, Deno, Cloudflare Workers)",
   "license": "MIT",
   "repository": {
