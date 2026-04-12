@@ -1,0 +1,38 @@
+[package]
+name = "bin-packing-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "WebAssembly bindings for the bin-packing cut list optimizer"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "bin_packing_wasm"
+
+[dependencies]
+bin-packing = { path = "../../crates/bin-packing", default-features = false }
+serde.workspace = true
+serde_json = { workspace = true, optional = true }
+serde-wasm-bindgen.workspace = true
+wasm-bindgen.workspace = true
+
+[features]
+default = ["one-d", "two-d", "three-d", "json"]
+one-d = ["bin-packing/one-d"]
+two-d = ["bin-packing/two-d"]
+three-d = ["bin-packing/three-d"]
+three-d-preview = ["three-d"]
+json = ["dep:serde_json"]
+
+[lints]
+workspace = true
+
+# Size-optimized release profile. `wasm-pack build --release` will pick this up
+# via the workspace. Users who want smaller output can still post-process with
+# `wasm-opt -Oz` via wasm-pack's `[package.metadata.wasm-pack.profile.release]`
+# table below.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

@@ -1,0 +1,266 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: "22"
+
+jobs:
+  rust:
+    name: Rust checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Build
+        run: cargo build --workspace --all-targets --all-features --locked
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace --all-targets --all-features --locked
+
+  node:
+    name: Node binding
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.25.0 --activate
+
+      - name: Install dependencies
+        run: pnpm --dir bindings/node install --frozen-lockfile
+
+      - name: Build native binding
+        run: pnpm --dir bindings/node run build
+
+      - name: Test native binding
+        run: pnpm --dir bindings/node test
+
+  wasm:
+    name: WebAssembly package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build wasm package
+        run: npm --prefix bindings/wasm run build
+
+      - name: Test wasm package
+        run: npm --prefix bindings/wasm test
+
+  node-native-release:
+    name: Build Node native ${{ matrix.target }}
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: node-native-${{ matrix.target }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.25.0 --activate
+
+      - name: Install dependencies
+        run: pnpm --dir bindings/node install --frozen-lockfile
+
+      - name: Build native package
+        run: pnpm --dir bindings/node exec napi build --platform --release --target ${{ matrix.target }}
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-native-${{ matrix.target }}
+          path: bindings/node/bin-packing.*.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish crates.io and npm
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - rust
+      - node
+      - wasm
+      - node-native-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.25.0 --activate
+
+      - name: Install Node binding dependencies
+        run: pnpm --dir bindings/node install --frozen-lockfile
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: node-native-*
+          path: bindings/node/artifacts
+          merge-multiple: true
+
+      - name: Verify tag version
+        run: |
+          node <<'JS'
+          const fs = require('node:fs');
+          const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          const rootCargo = fs.readFileSync('Cargo.toml', 'utf8');
+          const cargoVersion = rootCargo.match(/^version = "([^"]+)"/m)?.[1];
+          const packages = [
+            ['workspace Rust package', cargoVersion],
+            ['Node package', require('./bindings/node/package.json').version],
+            ['WASM package', require('./bindings/wasm/package.json').version],
+          ];
+          const mismatches = packages.filter(([, version]) => version !== tag);
+          if (mismatches.length) {
+            for (const [name, version] of mismatches) {
+              console.error(`${name} version ${version ?? '<missing>'} does not match tag ${tag}`);
+            }
+            process.exit(1);
+          }
+          JS
+
+      - name: Prepare native npm packages
+        run: |
+          pnpm --dir bindings/node exec napi create-npm-dirs
+          pnpm --dir bindings/node exec napi artifacts --output-dir artifacts
+
+      - name: Publish native npm packages
+        run: |
+          for dir in bindings/node/npm/*/; do
+            npm publish "$dir" --access public --provenance
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish Node wrapper package
+        run: npm publish --access public --provenance
+        working-directory: bindings/node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+      - name: Publish Rust crate
+        run: cargo publish -p bin-packing --locked
+
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Install WASM package dependencies
+        run: npm install
+        working-directory: bindings/wasm
+
+      - name: Publish WASM package
+        run: npm publish --access public --provenance
+        working-directory: bindings/wasm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

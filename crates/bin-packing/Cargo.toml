@@ -1,0 +1,36 @@
+[package]
+name = "bin-packing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Cut list optimization and bin packing library for 1D, 2D, and 3D stock problems"
+readme = "../../README.md"
+documentation = "https://docs.rs/bin-packing"
+keywords = ["bin-packing", "cutting-stock", "optimization", "packing", "algorithms"]
+categories = ["algorithms", "science"]
+
+[dependencies]
+rand.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[features]
+default = ["one-d", "two-d", "three-d"]
+one-d = []
+two-d = []
+three-d = ["two-d"]
+three-d-preview = ["three-d"]
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+
+[[bench]]
+name = "solver_benches"
+harness = false
+
+[lints]
+workspace = true

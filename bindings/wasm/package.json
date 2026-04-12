@@ -1,0 +1,115 @@
+{
+  "name": "@0xdoublesharp/bin-packing-wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly bindings for the bin-packing cut list optimizer (browser, Node.js, Deno, Cloudflare Workers)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doublesharp/bin-packing.git",
+    "directory": "bindings/wasm"
+  },
+  "keywords": [
+    "bin-packing",
+    "cutting-stock",
+    "optimization",
+    "packing",
+    "wasm",
+    "webassembly",
+    "maxrects",
+    "guillotine",
+    "skyline"
+  ],
+  "type": "module",
+  "main": "dist/bundler/bin_packing_wasm.js",
+  "module": "dist/bundler/bin_packing_wasm.js",
+  "types": "dist/bundler/bin_packing_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/bundler/bin_packing_wasm.d.ts",
+      "import": "./dist/bundler/bin_packing_wasm.js",
+      "default": "./dist/bundler/bin_packing_wasm.js"
+    },
+    "./web": {
+      "types": "./dist/web/bin_packing_wasm.d.ts",
+      "import": "./dist/web/bin_packing_wasm.js",
+      "default": "./dist/web/bin_packing_wasm.js"
+    },
+    "./nodejs": {
+      "types": "./dist/nodejs/bin_packing_wasm.d.cts",
+      "require": "./dist/nodejs/bin_packing_wasm.cjs",
+      "import": "./dist/nodejs/bin_packing_wasm.cjs",
+      "default": "./dist/nodejs/bin_packing_wasm.cjs"
+    },
+    "./one-d": {
+      "types": "./dist/one-d/bundler/bin_packing_wasm.d.ts",
+      "import": "./dist/one-d/bundler/bin_packing_wasm.js",
+      "default": "./dist/one-d/bundler/bin_packing_wasm.js"
+    },
+    "./one-d/web": {
+      "types": "./dist/one-d/web/bin_packing_wasm.d.ts",
+      "import": "./dist/one-d/web/bin_packing_wasm.js",
+      "default": "./dist/one-d/web/bin_packing_wasm.js"
+    },
+    "./one-d/nodejs": {
+      "types": "./dist/one-d/nodejs/bin_packing_wasm.d.cts",
+      "require": "./dist/one-d/nodejs/bin_packing_wasm.cjs",
+      "import": "./dist/one-d/nodejs/bin_packing_wasm.cjs",
+      "default": "./dist/one-d/nodejs/bin_packing_wasm.cjs"
+    },
+    "./two-d": {
+      "types": "./dist/two-d/bundler/bin_packing_wasm.d.ts",
+      "import": "./dist/two-d/bundler/bin_packing_wasm.js",
+      "default": "./dist/two-d/bundler/bin_packing_wasm.js"
+    },
+    "./two-d/web": {
+      "types": "./dist/two-d/web/bin_packing_wasm.d.ts",
+      "import": "./dist/two-d/web/bin_packing_wasm.js",
+      "default": "./dist/two-d/web/bin_packing_wasm.js"
+    },
+    "./two-d/nodejs": {
+      "types": "./dist/two-d/nodejs/bin_packing_wasm.d.cts",
+      "require": "./dist/two-d/nodejs/bin_packing_wasm.cjs",
+      "import": "./dist/two-d/nodejs/bin_packing_wasm.cjs",
+      "default": "./dist/two-d/nodejs/bin_packing_wasm.cjs"
+    },
+    "./three-d": {
+      "types": "./dist/three-d/bundler/bin_packing_wasm.d.ts",
+      "import": "./dist/three-d/bundler/bin_packing_wasm.js",
+      "default": "./dist/three-d/bundler/bin_packing_wasm.js"
+    },
+    "./three-d/web": {
+      "types": "./dist/three-d/web/bin_packing_wasm.d.ts",
+      "import": "./dist/three-d/web/bin_packing_wasm.js",
+      "default": "./dist/three-d/web/bin_packing_wasm.js"
+    },
+    "./three-d/nodejs": {
+      "types": "./dist/three-d/nodejs/bin_packing_wasm.d.cts",
+      "require": "./dist/three-d/nodejs/bin_packing_wasm.cjs",
+      "import": "./dist/three-d/nodejs/bin_packing_wasm.cjs",
+      "default": "./dist/three-d/nodejs/bin_packing_wasm.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": ["*.wasm"],
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:bundler": "wasm-pack build --release --target bundler --out-dir dist/bundler --out-name bin_packing_wasm",
+    "build:web": "wasm-pack build --release --target web --out-dir dist/web --out-name bin_packing_wasm",
+    "build:nodejs": "wasm-pack build --release --target nodejs --out-dir dist/nodejs --out-name bin_packing_wasm",
+    "clean": "node -e \"import('node:fs').then(fs => fs.promises.rm('dist', { recursive: true, force: true }))\"",
+    "test": "node --test test/smoke.test.mjs",
+    "prepack": "npm run build"
+  }
+}

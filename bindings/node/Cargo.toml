@@ -1,0 +1,31 @@
+[package]
+name = "bin-packing-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+napi.workspace = true
+napi-derive.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bin-packing = { path = "../../crates/bin-packing" }
+
+[features]
+default = ["one-d", "two-d", "three-d"]
+one-d = ["bin-packing/one-d"]
+two-d = ["bin-packing/two-d"]
+three-d = ["bin-packing/three-d"]
+three-d-preview = ["three-d"]
+
+[build-dependencies]
+napi-build.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+name = "bin_packing"
+
+[lints]
+workspace = true

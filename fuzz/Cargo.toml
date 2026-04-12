@@ -1,0 +1,27 @@
+[package]
+name = "bin-packing-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+bin-packing = { path = "../crates/bin-packing" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "solver_inputs"
+path = "fuzz_targets/solver_inputs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "three_d_modules"
+path = "fuzz_targets/three_d_modules.rs"
+test = false
+doc = false
+bench = false
