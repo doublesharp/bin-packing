@@ -18,6 +18,7 @@
     "bin-packing.*.node",
     "index.js",
     "LICENSE",
+    "README.md",
     "wrapper.d.ts",
     "wrapper.js"
   ],
