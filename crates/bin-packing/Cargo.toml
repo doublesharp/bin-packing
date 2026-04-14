@@ -13,15 +13,17 @@ categories = ["algorithms", "science"]
 
 [dependencies]
 rand.workspace = true
+rayon = { workspace = true, optional = true }
 serde.workspace = true
 thiserror.workspace = true
 
 [features]
-default = ["one-d", "two-d", "three-d"]
+default = ["one-d", "two-d", "three-d", "parallel"]
 one-d = []
 two-d = []
 three-d = ["two-d"]
 three-d-preview = ["three-d"]
+parallel = ["dep:rayon"]
 
 [dev-dependencies]
 criterion.workspace = true

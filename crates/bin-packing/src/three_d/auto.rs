@@ -4,7 +4,8 @@
 //! [`ThreeDSolution::is_better_than`].
 //!
 //! **Tier 1 — fast sweep** (always): six deterministic construction
-//! heuristics are run in sequence and the best result is kept.
+//! heuristics are run (in parallel when the `parallel` feature is
+//! enabled) and the best result is kept.
 //!
 //! **Tier 2 — meta sweep** (when `options.multistart_runs > 0`): the
 //! `MultiStart` and `LocalSearch` meta-strategies are added to the
@@ -17,6 +18,22 @@
 
 use super::model::{ThreeDOptions, ThreeDProblem, ThreeDSolution};
 use crate::Result;
+
+/// Run each solver function against `(problem, options)`, parallelising with
+/// rayon when the `parallel` feature is enabled and multiple cores exist.
+fn run_candidates(
+    candidates: &[SolverFn],
+    problem: &ThreeDProblem,
+    options: &ThreeDOptions,
+) -> Vec<Result<ThreeDSolution>> {
+    #[cfg(feature = "parallel")]
+    if crate::parallel::use_parallel() {
+        use rayon::prelude::*;
+        return candidates.par_iter().map(|solver| solver(problem, options)).collect();
+    }
+
+    candidates.iter().map(|solver| solver(problem, options)).collect()
+}
 
 /// Solve a 3D bin-packing problem by trying several algorithms and returning
 /// the best result under [`ThreeDSolution::is_better_than`].
@@ -33,7 +50,8 @@ pub(super) fn solve_auto(
     }
 
     // Tier 1: fast deterministic construction heuristics.
-    let candidates: &[SolverFn] = &[
+    // Tier 2 (multistart_runs > 0): meta-strategies appended to the pool.
+    let mut all_candidates: Vec<SolverFn> = vec![
         super::extreme_points::solve_extreme_points,
         super::extreme_points::solve_extreme_points_residual_space,
         super::extreme_points::solve_extreme_points_contact_point,
@@ -41,17 +59,12 @@ pub(super) fn solve_auto(
         super::layer::solve_layer_building,
         super::sorted::solve_first_fit_decreasing_volume,
     ];
-    let mut results = Vec::with_capacity(candidates.len().saturating_add(2));
-    for solver in candidates {
-        results.push(solver(problem, options));
-    }
-
-    // Tier 2: meta-strategies (only when multistart_runs > 0).
     if options.multistart_runs > 0 {
-        results.push(super::multi_start::solve_multi_start(problem, options));
-        results.push(super::local_search::solve_local_search(problem, options));
+        all_candidates.push(super::multi_start::solve_multi_start);
+        all_candidates.push(super::local_search::solve_local_search);
     }
 
+    let results = run_candidates(&all_candidates, problem, options);
     let total = results.len();
 
     // Collect successful results, tracking last error for fallback.
@@ -94,7 +107,7 @@ fn solve_auto_guillotine(
     problem: &ThreeDProblem,
     options: &ThreeDOptions,
 ) -> Result<ThreeDSolution> {
-    let candidates: &[SolverFn] = &[
+    let candidates: Vec<SolverFn> = vec![
         super::guillotine::solve_guillotine_3d,
         super::guillotine::solve_guillotine_3d_best_short_side_fit,
         super::guillotine::solve_guillotine_3d_best_long_side_fit,
@@ -105,11 +118,14 @@ fn solve_auto_guillotine(
         super::layer::solve_layer_building_guillotine,
     ];
 
+    let total = candidates.len();
+    let results = run_candidates(&candidates, problem, options);
+
     let mut best: Option<ThreeDSolution> = None;
     let mut last_error: Option<crate::BinPackingError> = None;
 
-    for solver in candidates {
-        match solver(problem, options) {
+    for result in results {
+        match result {
             Ok(sol) if sol.guillotine => {
                 if best.as_ref().is_none_or(|current| sol.is_better_than(current)) {
                     best = Some(sol);
@@ -124,8 +140,7 @@ fn solve_auto_guillotine(
         Some(mut sol) => {
             let winning_alg = sol.algorithm.clone();
             sol.metrics.notes.push(format!(
-                "auto: tried {} guillotine algorithms, best was {winning_alg}",
-                candidates.len()
+                "auto: tried {total} guillotine algorithms, best was {winning_alg}",
             ));
             Ok(sol)
         }
@@ -196,5 +211,58 @@ mod tests {
         let solution = solve_auto(&problem, &options).expect("solve_auto should succeed");
         assert!(solution.guillotine);
         assert_ne!(solution.algorithm, "auto");
+    }
+
+    /// Auto mode with multistart enabled exercises parallel tier-2 dispatch.
+    #[test]
+    fn auto_with_multistart_runs_tier2_candidates() {
+        let problem = ThreeDProblem {
+            bins: vec![Bin3D {
+                name: "bin".to_string(),
+                width: 10,
+                height: 10,
+                depth: 10,
+                cost: 1.0,
+                quantity: None,
+            }],
+            demands: vec![
+                BoxDemand3D {
+                    name: "a".to_string(),
+                    width: 5,
+                    height: 5,
+                    depth: 5,
+                    quantity: 2,
+                    allowed_rotations: RotationMask3D::ALL,
+                },
+                BoxDemand3D {
+                    name: "b".to_string(),
+                    width: 3,
+                    height: 3,
+                    depth: 3,
+                    quantity: 4,
+                    allowed_rotations: RotationMask3D::ALL,
+                },
+            ],
+        };
+        let options =
+            ThreeDOptions { multistart_runs: 4, seed: Some(42), ..ThreeDOptions::default() };
+        let solution = solve_auto(&problem, &options).expect("auto with multistart");
+        assert!(solution.unplaced.is_empty());
+        assert!(solution.metrics.notes.iter().any(|n| n.starts_with("auto: tried ")));
+    }
+
+    /// Running auto twice with the same problem produces the same result.
+    #[test]
+    fn auto_is_deterministic() {
+        let problem = simple_problem();
+        let options =
+            ThreeDOptions { multistart_runs: 2, seed: Some(7), ..ThreeDOptions::default() };
+        let first = solve_auto(&problem, &options).expect("first");
+        let second = solve_auto(&problem, &options).expect("second");
+        assert_eq!(first.bin_count, second.bin_count);
+        assert_eq!(first.algorithm, second.algorithm);
+        assert_eq!(first.total_waste_volume, second.total_waste_volume);
+        assert_eq!(first.total_cost, second.total_cost);
+        assert_eq!(first.unplaced.len(), second.unplaced.len());
     }
 }

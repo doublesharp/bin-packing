@@ -33,6 +33,11 @@
 //!   that restricts the solver to guillotine-compatible layouts.
 //! - Kerf and trim modeling for 1D cuts so layouts match physical cut lists.
 //! - Reproducible randomized search via an optional `seed`.
+//! - Automatic multi-core parallelism via [`rayon`] when the `parallel` feature
+//!   is enabled (on by default). Auto-mode solvers dispatch algorithms in
+//!   parallel and multi-start / GRASP / local-search meta-strategies run their
+//!   iterations concurrently. Falls back to sequential execution on single-core
+//!   hosts or when the feature is disabled.
 //! - Structured [`BinPackingError`] variants for input validation, infeasible
 //!   demands (1D, 2D, and 3D), and unsupported solver configurations.
 //! - `metrics` blocks with iteration counts, explored states, and diagnostic notes.
@@ -108,6 +113,8 @@
 mod error;
 #[cfg(feature = "one-d")]
 pub mod one_d;
+#[cfg_attr(not(feature = "parallel"), allow(dead_code))]
+mod parallel;
 #[cfg(feature = "two-d")]
 pub mod two_d;
 

@@ -14,11 +14,12 @@ serde_json.workspace = true
 bin-packing = { path = "../../crates/bin-packing" }
 
 [features]
-default = ["one-d", "two-d", "three-d"]
+default = ["one-d", "two-d", "three-d", "parallel"]
 one-d = ["bin-packing/one-d"]
 two-d = ["bin-packing/two-d"]
 three-d = ["bin-packing/three-d"]
 three-d-preview = ["three-d"]
+parallel = ["bin-packing/parallel"]
 
 [build-dependencies]
 napi-build.workspace = true

@@ -67,6 +67,9 @@ pub(super) fn solve_local_search(
     let mut best = seed_solution.clone();
     best.algorithm = "local_search".to_string();
 
+    // Restarts are sequential: each builds on the current best, so later
+    // restarts benefit from earlier improvements. This is inherently
+    // iterative and not suitable for parallelisation.
     let mut total_passes: usize = 0;
     for _ in 0..restarts {
         let candidate = improve(best.clone(), problem, options, &mut rng);

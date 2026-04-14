@@ -104,20 +104,22 @@ pub(super) fn solve_multistart(
 
     let mut best =
         pack_with_order(problem, &items, "multi_start", 1, MaxRectsStrategy::BestAreaFit)?;
-    let mut rng = match options.seed {
-        Some(seed) => SmallRng::seed_from_u64(seed),
-        None => SmallRng::seed_from_u64(0x4D41_5852_4543_5453),
-    };
+    let base_seed = options.seed.unwrap_or(0x4D41_5852_4543_5453);
 
-    for run in 0..options.multistart_runs.max(1) {
+    let runs = options.multistart_runs.max(1);
+    let candidates = crate::parallel::par_map_indexed(runs, |run| {
+        let mut rng = SmallRng::seed_from_u64(crate::parallel::iteration_seed(base_seed, run));
         let trial_items = multistart_ordered_items(&items, &mut rng);
-        let candidate = pack_with_order(
+        pack_with_order(
             problem,
             &trial_items,
             "multi_start",
             run + 2,
             MaxRectsStrategy::BestAreaFit,
-        )?;
+        )
+    });
+
+    for candidate in candidates.into_iter().flatten() {
         if candidate.is_better_than(&best) {
             best = candidate;
         }

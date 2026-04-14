@@ -111,53 +111,62 @@ pub(super) fn solve_local_search(
         best_start_note = "started from best_fit_decreasing".to_string();
     }
 
-    let mut rng = seeded_rng(options.seed);
+    let base_seed = options.seed.unwrap_or(DEFAULT_SEED);
     let mut iterations = 2;
     let mut best_notes = vec![
         best_start_note,
         "combines multistart reorderings with a bin-elimination repair pass".to_string(),
     ];
 
-    for run in 0..options.multistart_runs.max(1) {
+    let runs = options.multistart_runs.max(1);
+    let run_results = crate::parallel::par_map_indexed(runs, |run| {
+        let mut rng = SmallRng::seed_from_u64(crate::parallel::iteration_seed(base_seed, run));
         let mut pieces = baseline_pieces.clone();
         perturb_piece_order(&mut pieces, &mut rng);
 
         let strategy =
             if run % 2 == 0 { PlacementStrategy::BestFit } else { PlacementStrategy::FirstFit };
 
-        let (mut bins, unplaced) = pack_ordered(problem, pieces, strategy)?;
-        if unplaced.is_empty() {
-            eliminate_bins(problem, &mut bins, options.improvement_rounds);
+        let pack_result = pack_ordered(problem, pieces, strategy);
+        match pack_result {
+            Ok((mut bins, unplaced)) => {
+                if unplaced.is_empty() {
+                    eliminate_bins(problem, &mut bins, options.improvement_rounds);
+                }
+                Ok(OneDSolution::from_bins(
+                    "local_search",
+                    false,
+                    None,
+                    &problem.stock,
+                    &bins,
+                    &unplaced,
+                    SolverMetrics1D {
+                        iterations: 0,
+                        generated_patterns: 0,
+                        enumerated_patterns: 0,
+                        explored_states: 0,
+                        notes: vec![format!(
+                            "run {} used {}",
+                            run + 1,
+                            match strategy {
+                                PlacementStrategy::FirstFit => "first_fit",
+                                PlacementStrategy::BestFit => "best_fit",
+                            }
+                        )],
+                    },
+                ))
+            }
+            Err(err) => Err(err),
         }
+    });
 
-        let solution = OneDSolution::from_bins(
-            "local_search",
-            false,
-            None,
-            &problem.stock,
-            &bins,
-            &unplaced,
-            SolverMetrics1D {
-                iterations: iterations + 1,
-                generated_patterns: 0,
-                enumerated_patterns: 0,
-                explored_states: 0,
-                notes: vec![format!(
-                    "run {} used {}",
-                    run + 1,
-                    match strategy {
-                        PlacementStrategy::FirstFit => "first_fit",
-                        PlacementStrategy::BestFit => "best_fit",
-                    }
-                )],
-            },
-        );
-
-        if solution.is_better_than(&best_solution) {
+    for (run, result) in run_results.into_iter().enumerate() {
+        if let Ok(solution) = result
+            && solution.is_better_than(&best_solution)
+        {
             best_notes.push(format!("accepted improved run {}", run + 1));
             best_solution = solution;
         }
-
         iterations += 1;
     }
 
@@ -170,7 +179,8 @@ pub(super) fn solve_local_search(
 // supply one. The literal encodes "BINPACK0" in ASCII so `grep` can find it.
 const DEFAULT_SEED: u64 = 0x4249_4E50_4143_4B30;
 
-pub(super) fn seeded_rng(seed: Option<u64>) -> SmallRng {
+#[cfg(test)]
+fn seeded_rng(seed: Option<u64>) -> SmallRng {
     match seed {
         Some(seed) => SmallRng::seed_from_u64(seed),
         None => SmallRng::seed_from_u64(DEFAULT_SEED),

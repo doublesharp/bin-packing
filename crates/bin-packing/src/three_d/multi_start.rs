@@ -43,24 +43,31 @@ pub(super) fn solve_multi_start(
     options: &ThreeDOptions,
 ) -> Result<ThreeDSolution> {
     let base_items = problem.expanded_items();
-    let mut rng = SmallRng::seed_from_u64(options.seed.unwrap_or(DEFAULT_SEED));
+    let base_seed = options.seed.unwrap_or(DEFAULT_SEED);
     let runs = options.multistart_runs.max(1);
+
+    let iteration_results = crate::parallel::par_map_indexed(runs, |run| {
+        let mut rng = SmallRng::seed_from_u64(crate::parallel::iteration_seed(base_seed, run));
+        let mut trial_items = base_items.clone();
+        trial_items.shuffle(&mut rng);
+        (
+            run,
+            solve_with_scoring_on_items(
+                problem,
+                trial_items,
+                options,
+                ExtremePointsScoring::VolumeFitResidual,
+                "multi_start",
+            ),
+        )
+    });
 
     let mut best: Option<ThreeDSolution> = None;
     let mut pending_notes: Vec<String> = Vec::new();
     let mut first_error: Option<crate::BinPackingError> = None;
 
-    for run in 0..runs {
-        let mut trial_items = base_items.clone();
-        trial_items.shuffle(&mut rng);
-
-        match solve_with_scoring_on_items(
-            problem,
-            trial_items,
-            options,
-            ExtremePointsScoring::VolumeFitResidual,
-            "multi_start",
-        ) {
+    for (run, result) in iteration_results {
+        match result {
             Ok(candidate) => {
                 best = Some(match best.take() {
                     Some(current) if current.is_better_than(&candidate) => current,

@@ -73,94 +73,90 @@ pub fn solve_2d(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSoluti
     }
 }
 
+type SolverFn2D = fn(&TwoDProblem, &TwoDOptions) -> Result<TwoDSolution>;
+
+/// Run each solver function against `(problem, options)`, parallelising with
+/// rayon when the `parallel` feature is enabled and multiple cores exist.
+fn run_candidates_2d(
+    candidates: &[SolverFn2D],
+    problem: &TwoDProblem,
+    options: &TwoDOptions,
+) -> Vec<Result<TwoDSolution>> {
+    #[cfg(feature = "parallel")]
+    if crate::parallel::use_parallel() {
+        use rayon::prelude::*;
+        return candidates.par_iter().map(|solver| solver(problem, options)).collect();
+    }
+
+    candidates.iter().map(|solver| solver(problem, options)).collect()
+}
+
 fn solve_auto(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution> {
     if options.guillotine_required {
         return solve_auto_guillotine(problem, options);
     }
 
-    let mut best = maxrects::solve_maxrects(&problem, &options)?;
-    let bssf = maxrects::solve_maxrects_bssf(&problem, &options)?;
-    if bssf.is_better_than(&best) {
-        best = bssf;
-    }
+    let candidates: Vec<SolverFn2D> = vec![
+        maxrects::solve_maxrects,
+        maxrects::solve_maxrects_bssf,
+        maxrects::solve_maxrects_blsf,
+        maxrects::solve_maxrects_contact_point,
+        skyline::solve_skyline,
+        skyline::solve_skyline_min_waste,
+        shelf::solve_bfdh,
+        guillotine::solve_guillotine_bssf,
+        guillotine::solve_guillotine_slas,
+        maxrects::solve_multistart,
+    ];
 
-    let blsf = maxrects::solve_maxrects_blsf(&problem, &options)?;
-    if blsf.is_better_than(&best) {
-        best = blsf;
+    let results = run_candidates_2d(&candidates, &problem, &options);
+    let mut best: Option<TwoDSolution> = None;
+    let mut last_error: Option<crate::BinPackingError> = None;
+    for result in results {
+        match result {
+            Ok(sol) => {
+                if best.as_ref().is_none_or(|b| sol.is_better_than(b)) {
+                    best = Some(sol);
+                }
+            }
+            Err(e) => last_error = Some(e),
+        }
     }
-
-    let contact = maxrects::solve_maxrects_contact_point(&problem, &options)?;
-    if contact.is_better_than(&best) {
-        best = contact;
+    match best {
+        Some(sol) => Ok(sol),
+        None => Err(last_error.expect("at least one candidate must have been run")),
     }
-
-    let skyline = skyline::solve_skyline(&problem, &options)?;
-    if skyline.is_better_than(&best) {
-        best = skyline;
-    }
-
-    let skyline_min_waste = skyline::solve_skyline_min_waste(&problem, &options)?;
-    if skyline_min_waste.is_better_than(&best) {
-        best = skyline_min_waste;
-    }
-
-    let bfdh = shelf::solve_bfdh(&problem, &options)?;
-    if bfdh.is_better_than(&best) {
-        best = bfdh;
-    }
-
-    let guillotine_bssf = guillotine::solve_guillotine_bssf(&problem, &options)?;
-    if guillotine_bssf.is_better_than(&best) {
-        best = guillotine_bssf;
-    }
-
-    let guillotine_slas = guillotine::solve_guillotine_slas(&problem, &options)?;
-    if guillotine_slas.is_better_than(&best) {
-        best = guillotine_slas;
-    }
-
-    let multistart = maxrects::solve_multistart(&problem, &options)?;
-    if multistart.is_better_than(&best) {
-        best = multistart;
-    }
-
-    Ok(best)
 }
 
 fn solve_auto_guillotine(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution> {
-    let mut best = guillotine::solve_guillotine(&problem, &options)?;
+    let candidates: Vec<SolverFn2D> = vec![
+        guillotine::solve_guillotine,
+        guillotine::solve_guillotine_bssf,
+        guillotine::solve_guillotine_blsf,
+        guillotine::solve_guillotine_slas,
+        guillotine::solve_guillotine_llas,
+        guillotine::solve_guillotine_min_area_split,
+        guillotine::solve_guillotine_max_area_split,
+    ];
 
-    let bssf = guillotine::solve_guillotine_bssf(&problem, &options)?;
-    if bssf.is_better_than(&best) {
-        best = bssf;
+    let results = run_candidates_2d(&candidates, &problem, &options);
+    let mut best: Option<TwoDSolution> = None;
+    let mut last_error: Option<crate::BinPackingError> = None;
+    for result in results {
+        match result {
+            Ok(sol) if sol.guillotine => {
+                if best.as_ref().is_none_or(|b| sol.is_better_than(b)) {
+                    best = Some(sol);
+                }
+            }
+            Ok(_) => {} // skip non-guillotine solutions
+            Err(e) => last_error = Some(e),
+        }
     }
-
-    let blsf = guillotine::solve_guillotine_blsf(&problem, &options)?;
-    if blsf.is_better_than(&best) {
-        best = blsf;
+    match best {
+        Some(sol) => Ok(sol),
+        None => Err(last_error.expect("at least one candidate must have been run")),
     }
-
-    let slas = guillotine::solve_guillotine_slas(&problem, &options)?;
-    if slas.is_better_than(&best) {
-        best = slas;
-    }
-
-    let llas = guillotine::solve_guillotine_llas(&problem, &options)?;
-    if llas.is_better_than(&best) {
-        best = llas;
-    }
-
-    let min_area = guillotine::solve_guillotine_min_area_split(&problem, &options)?;
-    if min_area.is_better_than(&best) {
-        best = min_area;
-    }
-
-    let max_area = guillotine::solve_guillotine_max_area_split(&problem, &options)?;
-    if max_area.is_better_than(&best) {
-        best = max_area;
-    }
-
-    Ok(best)
 }
 
 pub(crate) use model::ItemInstance2D;

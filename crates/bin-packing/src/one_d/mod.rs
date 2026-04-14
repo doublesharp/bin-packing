@@ -74,19 +74,39 @@ fn estimate_required_stock_counts(
         .collect())
 }
 
+type SolverFn1D = fn(&OneDProblem, &OneDOptions) -> Result<OneDSolution>;
+
+fn run_candidates_1d(
+    candidates: &[SolverFn1D],
+    problem: &OneDProblem,
+    options: &OneDOptions,
+) -> Vec<Result<OneDSolution>> {
+    #[cfg(feature = "parallel")]
+    if crate::parallel::use_parallel() {
+        use rayon::prelude::*;
+        return candidates.par_iter().map(|solver| solver(problem, options)).collect();
+    }
+
+    candidates.iter().map(|solver| solver(problem, options)).collect()
+}
+
 fn solve_auto(problem: &OneDProblem, options: &OneDOptions) -> Result<OneDSolution> {
-    let mut best = heuristics::solve_ffd(problem, options)?;
+    let heuristic_candidates: &[SolverFn1D] =
+        &[heuristics::solve_ffd, heuristics::solve_bfd, heuristics::solve_local_search];
 
-    let bfd = heuristics::solve_bfd(problem, options)?;
-    if bfd.is_better_than(&best) {
-        best = bfd;
+    let results = run_candidates_1d(heuristic_candidates, problem, options);
+    let mut best: Option<OneDSolution> = None;
+    for sol in results.into_iter().flatten() {
+        if best.as_ref().is_none_or(|b| sol.is_better_than(b)) {
+            best = Some(sol);
+        }
     }
+    let mut best = best.ok_or_else(|| {
+        crate::BinPackingError::Unsupported("auto: all heuristic candidates failed".to_string())
+    })?;
 
-    let local = heuristics::solve_local_search(problem, options)?;
-    if local.is_better_than(&best) {
-        best = local;
-    }
-
+    // Exact solver runs after heuristics — its result takes precedence when
+    // it reports `exact = true` even if the heuristic score is equal.
     let should_attempt_exact = problem.stock.len() == 1
         && problem.stock[0].available.is_none()
         && problem.demands.len() <= options.auto_exact_max_types

@@ -100,14 +100,11 @@ pub(super) fn solve_grasp(
     options: &ThreeDOptions,
 ) -> Result<ThreeDSolution> {
     let base_items = problem.expanded_items();
-    let mut rng = SmallRng::seed_from_u64(options.seed.unwrap_or(DEFAULT_SEED));
+    let base_seed = options.seed.unwrap_or(DEFAULT_SEED);
     let runs = options.multistart_runs.max(1);
 
-    let mut best: Option<ThreeDSolution> = None;
-    let mut pending_notes: Vec<String> = Vec::new();
-    let mut first_error: Option<crate::BinPackingError> = None;
-
-    for run in 0..runs {
+    let iteration_results = crate::parallel::par_map_indexed(runs, |run| {
+        let mut rng = SmallRng::seed_from_u64(crate::parallel::iteration_seed(base_seed, run));
         // Phase 1: greedy randomized construction via RCL ordering.
         let ordered_items = rcl_order(base_items.clone(), &mut rng);
 
@@ -119,25 +116,36 @@ pub(super) fn solve_grasp(
             "grasp",
         );
 
-        let constructed = match construction_result {
-            Ok(sol) => sol,
-            Err(err) => {
+        match construction_result {
+            Ok(constructed) => {
+                // Phase 2: local search improvement.
+                let mut candidate = improve(constructed, problem, options, &mut rng);
+                candidate.algorithm = "grasp".to_string();
+                Ok((run, candidate))
+            }
+            Err(err) => Err((run, err)),
+        }
+    });
+
+    let mut best: Option<ThreeDSolution> = None;
+    let mut pending_notes: Vec<String> = Vec::new();
+    let mut first_error: Option<crate::BinPackingError> = None;
+
+    for result in iteration_results {
+        match result {
+            Ok((_run, candidate)) => {
+                best = Some(match best.take() {
+                    Some(current) if current.is_better_than(&candidate) => current,
+                    _ => candidate,
+                });
+            }
+            Err((run, err)) => {
                 pending_notes.push(format!("grasp: run {run} construction failed: {err}"));
                 if first_error.is_none() {
                     first_error = Some(err);
                 }
-                continue;
             }
-        };
-
-        // Phase 2: local search improvement.
-        let mut candidate = improve(constructed, problem, options, &mut rng);
-        candidate.algorithm = "grasp".to_string();
-
-        best = Some(match best.take() {
-            Some(current) if current.is_better_than(&candidate) => current,
-            _ => candidate,
-        });
+        }
     }
 
     match best {
