@@ -34,9 +34,9 @@ native binaries, no build step, no `node-gyp`.
 ## Installation
 
 ```sh
-npm install @0xdoublesharp/bin-packing-wasm
-# or
 pnpm add @0xdoublesharp/bin-packing-wasm
+# or
+npm install @0xdoublesharp/bin-packing-wasm
 # or
 yarn add @0xdoublesharp/bin-packing-wasm
 ```
@@ -277,10 +277,10 @@ rustup target add wasm32-unknown-unknown
 cargo install wasm-pack
 
 # Build combined and dimension-specific bundler, web, and nodejs targets into dist/
-npm run build
+pnpm run build
 
 # Run the Node smoke test
-npm test
+pnpm test
 ```
 
 ## License

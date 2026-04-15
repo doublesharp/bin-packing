@@ -89,14 +89,14 @@ bindings.
   can surface diagnostics without re-running.
 - **Benchmarks.** Criterion benches live in
   [crates/bin-packing/benches/solver_benches.rs](crates/bin-packing/benches/solver_benches.rs).
-- **Fuzzing.** `cargo fuzz run solver_inputs` exercises both solvers against
-  randomized inputs.
+- **Fuzzing.** `cargo fuzz run solver_inputs` exercises the 1D, 2D, and 3D
+  solvers against randomized inputs.
 
 ## Algorithms
 
-Selected via `OneDOptions.algorithm` / `TwoDOptions.algorithm`. All names
-below are the exact `snake_case` strings accepted by `serde` and the Node
-bindings.
+Selected via `OneDOptions.algorithm`, `TwoDOptions.algorithm`, or
+`ThreeDOptions.algorithm`. All names below are the exact `snake_case` strings
+accepted by `serde` and the Node / WebAssembly bindings.
 
 ### 3D (`ThreeDAlgorithm`)
 
@@ -233,7 +233,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bin-packing = "0.1"
+bin-packing = "0.2"
 ```
 
 The dimension modules expose three entry points:
@@ -653,7 +653,7 @@ publishes to npm as `@0xdoublesharp/bin-packing-wasm`. It ships combined and
 dimension-specific targets through a single package:
 
 ```sh
-npm install @0xdoublesharp/bin-packing-wasm
+pnpm add @0xdoublesharp/bin-packing-wasm
 ```
 
 ```js
@@ -685,8 +685,8 @@ Build it locally:
 cd bindings/wasm
 rustup target add wasm32-unknown-unknown
 cargo install wasm-pack
-npm run build   # builds combined and dimension-specific targets into dist/
-npm test        # runs the Node smoke test against dist/nodejs
+pnpm run build  # builds combined and dimension-specific targets into dist/
+pnpm test       # runs the Node smoke test against dist/nodejs
 ```
 
 See [bindings/wasm/README.md](bindings/wasm/README.md) for the full API
@@ -734,8 +734,8 @@ WebAssembly binding build and smoke test:
 
 ```sh
 cd bindings/wasm
-npm run build
-npm test
+pnpm run build
+pnpm test
 ```
 
 Fuzz target build and execution:

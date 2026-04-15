@@ -14,7 +14,7 @@ Prebuilt binaries for Linux (x64, arm64), macOS (x64, arm64), and Windows
 ## Install
 
 ```sh
-npm install @0xdoublesharp/bin-packing
+pnpm add @0xdoublesharp/bin-packing
 ```
 
 ## Usage
