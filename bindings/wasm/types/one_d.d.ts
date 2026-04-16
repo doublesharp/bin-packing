@@ -89,6 +89,43 @@ export interface OneDSolution {
   metrics: SolverMetrics1D;
 }
 
+// ---------------------------------------------------------------------------
+// Cut planning — 1D
+// ---------------------------------------------------------------------------
+
+export type CutPlanPreset1D = 'chop_saw';
+
+export interface CutPlanOptions1D {
+  preset?: CutPlanPreset1D;
+  cut_cost?: number;
+  fence_reset_cost?: number;
+}
+
+export interface EffectiveCosts1D {
+  cut_cost: number;
+  fence_reset_cost: number;
+}
+
+export type CutStep1D =
+  | { kind: 'cut'; position: number; piece_name: string }
+  | { kind: 'fence_reset'; new_position: number };
+
+export interface BarCutPlan1D {
+  stock_name: string;
+  bar_index_in_solution: number;
+  total_cost: number;
+  num_cuts: number;
+  num_fence_resets: number;
+  steps: CutStep1D[];
+}
+
+export interface CutPlanSolution1D {
+  preset: CutPlanPreset1D;
+  effective_costs: EffectiveCosts1D;
+  bar_plans: BarCutPlan1D[];
+  total_cost: number;
+}
+
 /**
  * Solve a 1D cutting-stock problem. Accepts a plain JS object and returns the
  * solution as a plain JS object. Throws on validation errors, infeasible
@@ -98,6 +135,17 @@ export function solve1d(
   problem: OneDProblem,
   options?: OneDOptions,
 ): OneDSolution;
+
+/**
+ * Generate a cut plan for a finished 1D solution. Accepts plain JS objects
+ * matching the `OneDProblem` and `OneDSolution` shapes, and an optional
+ * options object. Returns the cut plan as a plain JS object.
+ */
+export function plan1dCuts(
+  problem: OneDProblem,
+  solution: OneDSolution,
+  options?: CutPlanOptions1D,
+): CutPlanSolution1D;
 
 /** Return the package version string. */
 export function version(): string;

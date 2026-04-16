@@ -125,6 +125,66 @@ Solutions are compared lexicographically on the tuple:
 The `is_better_than` comparator is defined once on `OneDSolution` and
 reused by every algorithm that picks among its own candidates.
 
+## Cut plans
+
+After solving, call `bin_packing::one_d::cut_plan::plan_cuts(&solution, &options)`
+to generate an ordered cut sequence for every bar in the solution. The planner is a
+pure post-processor — it reads the finished layout and emits steps without
+re-running the solver.
+
+### 1D cut sequencing
+
+For each `BarCutPlan1D` the planner emits:
+
+1. **`CutStep1D::FenceReset { new_position }`** — emitted before the first cut
+   on a bar, and again whenever the cut length changes from the previous cut
+   (i.e., the fence stop must move to a new position).
+2. **`CutStep1D::Cut { position, piece_name }`** — one entry per placed cut,
+   ordered left-to-right along the bar (consuming the bar from one end).
+
+Cut positions are read directly from the layout's placement coordinates; kerf is
+already baked into those positions and requires no additional arithmetic in the
+planner.
+
+Fence resets are only emitted when the cut length *changes*. A run of identical
+cuts (e.g., four rails of the same length from one bar) produces a single fence
+reset followed by four cut steps — not four resets.
+
+**Cost formula per bar:**
+`total_cost = num_cuts * cut_cost + num_fence_resets * fence_reset_cost`
+
+### `ChopSaw` preset
+
+The only 1D preset. Default costs: `cut_cost = 1.0`, `fence_reset_cost = 0.3`.
+Override either field by setting it explicitly in `CutPlanOptions1D`.
+
+### Output shape
+
+```rust
+pub struct BarCutPlan1D {
+    pub stock_name: String,
+    pub bar_index_in_solution: usize,
+    pub total_cost: f64,
+    pub num_cuts: usize,
+    pub num_fence_resets: usize,
+    pub steps: Vec<CutStep1D>,
+}
+
+pub struct CutPlanSolution1D {
+    pub preset: CutPlanPreset1D,
+    pub effective_costs: EffectiveCosts1D,  // resolved cost values after overrides
+    pub bar_plans: Vec<BarCutPlan1D>,
+    pub total_cost: f64,
+}
+```
+
+### Errors
+
+`CutPlanError::InvalidOptions(String)` is returned when any cost field is
+negative, `NaN`, or infinite. There is no `NonGuillotineNotCuttable` variant for
+1D — all 1D layouts are inherently sequential and the `ChopSaw` preset imposes
+no layout-shape constraint.
+
 ## Reproducibility
 
 Local search is the only 1D algorithm that consults `OneDOptions.seed`.

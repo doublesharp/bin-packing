@@ -15,11 +15,11 @@ use serde::de::DeserializeOwned;
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "one-d")]
-use bin_packing::one_d::{OneDOptions, OneDProblem, solve_1d};
+use bin_packing::one_d::{OneDOptions, OneDProblem, OneDSolution, solve_1d};
 #[cfg(feature = "three-d")]
 use bin_packing::three_d::{ThreeDOptions, ThreeDProblem, solve_3d};
 #[cfg(feature = "two-d")]
-use bin_packing::two_d::{TwoDOptions, TwoDProblem, solve_2d};
+use bin_packing::two_d::{TwoDOptions, TwoDProblem, TwoDSolution, solve_2d};
 
 /// Solve a 1D cutting-stock problem. Accepts a plain JS object matching the
 /// `OneDProblem` shape and an optional options object. Returns the solution
@@ -87,6 +87,38 @@ pub fn solve_3d_json(problem_json: &str, options_json: Option<String>) -> Result
     let options = options_from_json::<ThreeDOptions>(options_json.as_deref())?;
     let solution = solve_3d(problem, options).map_err(to_js_error)?;
     serde_json::to_string(&solution).map_err(to_js_error)
+}
+
+/// Generate a cut plan for a finished 1D solution. Accepts a plain JS object
+/// matching the `OneDProblem` shape, a plain JS object matching the
+/// `OneDSolution` shape, and an optional options object. Returns the cut plan
+/// as a plain JS object.
+#[cfg(feature = "one-d")]
+#[wasm_bindgen(js_name = plan1dCuts)]
+pub fn plan_1d_cuts_js(
+    problem: JsValue,
+    solution: JsValue,
+    options: JsValue,
+) -> Result<JsValue, JsError> {
+    use bin_packing::one_d::cut_plan::{CutPlanOptions1D, plan_cuts};
+    let problem = from_js_value::<OneDProblem>(problem, "problem")?;
+    let solution = from_js_value::<OneDSolution>(solution, "solution")?;
+    let options = options_from_js::<CutPlanOptions1D>(options)?;
+    let cut_plan = plan_cuts(&problem, &solution, &options).map_err(to_js_error)?;
+    to_js_value(&cut_plan)
+}
+
+/// Generate a cut plan for a finished 2D solution. Accepts a plain JS object
+/// matching the `TwoDSolution` shape and an optional options object. Returns
+/// the cut plan as a plain JS object.
+#[cfg(feature = "two-d")]
+#[wasm_bindgen(js_name = plan2dCuts)]
+pub fn plan_2d_cuts_js(solution: JsValue, options: JsValue) -> Result<JsValue, JsError> {
+    use bin_packing::two_d::cut_plan::{CutPlanOptions2D, plan_cuts};
+    let solution = from_js_value::<TwoDSolution>(solution, "solution")?;
+    let options = options_from_js::<CutPlanOptions2D>(options)?;
+    let cut_plan = plan_cuts(&solution, &options).map_err(to_js_error)?;
+    to_js_value(&cut_plan)
 }
 
 /// Return the crate version string.

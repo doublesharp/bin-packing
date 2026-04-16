@@ -30,5 +30,7 @@ export interface InitOutput {
   readonly solve1dJson: typeof solve1dJson;
   readonly solve2dJson: typeof solve2dJson;
   readonly solve3dJson: typeof solve3dJson;
+  readonly plan1dCuts: typeof plan1dCuts;
+  readonly plan2dCuts: typeof plan2dCuts;
   readonly version: typeof version;
 }

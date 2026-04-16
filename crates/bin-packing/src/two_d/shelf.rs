@@ -61,20 +61,21 @@ enum ShelfStrategy {
     BestFit,
 }
 
-pub(super) fn solve_nfdh(problem: &TwoDProblem, _options: &TwoDOptions) -> Result<TwoDSolution> {
-    solve_shelf(problem, ShelfStrategy::NextFit, "next_fit_decreasing_height")
+pub(super) fn solve_nfdh(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDSolution> {
+    solve_shelf(problem, options, ShelfStrategy::NextFit, "next_fit_decreasing_height")
 }
 
-pub(super) fn solve_ffdh(problem: &TwoDProblem, _options: &TwoDOptions) -> Result<TwoDSolution> {
-    solve_shelf(problem, ShelfStrategy::FirstFit, "first_fit_decreasing_height")
+pub(super) fn solve_ffdh(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDSolution> {
+    solve_shelf(problem, options, ShelfStrategy::FirstFit, "first_fit_decreasing_height")
 }
 
-pub(super) fn solve_bfdh(problem: &TwoDProblem, _options: &TwoDOptions) -> Result<TwoDSolution> {
-    solve_shelf(problem, ShelfStrategy::BestFit, "best_fit_decreasing_height")
+pub(super) fn solve_bfdh(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDSolution> {
+    solve_shelf(problem, options, ShelfStrategy::BestFit, "best_fit_decreasing_height")
 }
 
 fn solve_shelf(
     problem: &TwoDProblem,
+    options: &TwoDOptions,
     strategy: ShelfStrategy,
     algorithm: &str,
 ) -> Result<TwoDSolution> {
@@ -90,7 +91,13 @@ fn solve_shelf(
         explored_states = explored_states.saturating_add(1);
 
         if let Some(candidate) = choose_existing_shelf(problem, &sheets, &item, strategy) {
-            place_on_existing_shelf(&mut sheets[candidate.sheet_index], &item, candidate);
+            let sheet_kerf = problem.sheets[sheets[candidate.sheet_index].stock_index].kerf;
+            place_on_existing_shelf(
+                &mut sheets[candidate.sheet_index],
+                sheet_kerf,
+                &item,
+                candidate,
+            );
             continue;
         }
 
@@ -122,6 +129,7 @@ fn solve_shelf(
             explored_states,
             notes: vec!["decreasing-height shelf packing heuristic".to_string()],
         },
+        options.min_usable_side,
     ))
 }
 
@@ -134,19 +142,33 @@ fn choose_existing_shelf(
     match strategy {
         ShelfStrategy::NextFit => sheets.last().and_then(|sheet| {
             let sheet_index = sheets.len().saturating_sub(1);
-            let sheet_width = problem.sheets[sheet.stock_index].width;
+            let sheet_def = &problem.sheets[sheet.stock_index];
+            let (eff_w, _eff_h) = crate::two_d::model::effective_bounds(sheet_def);
             sheet.shelves.last().and_then(|shelf| {
                 let shelf_index = sheet.shelves.len().saturating_sub(1);
-                existing_shelf_candidate(sheet_index, shelf_index, sheet_width, shelf, item)
+                existing_shelf_candidate(
+                    sheet_index,
+                    shelf_index,
+                    eff_w,
+                    sheet_def.kerf,
+                    shelf,
+                    item,
+                )
             })
         }),
         ShelfStrategy::FirstFit => {
             for (sheet_index, sheet) in sheets.iter().enumerate() {
-                let sheet_width = problem.sheets[sheet.stock_index].width;
+                let sheet_def = &problem.sheets[sheet.stock_index];
+                let (eff_w, _eff_h) = crate::two_d::model::effective_bounds(sheet_def);
                 for (shelf_index, shelf) in sheet.shelves.iter().enumerate() {
-                    if let Some(candidate) =
-                        existing_shelf_candidate(sheet_index, shelf_index, sheet_width, shelf, item)
-                    {
+                    if let Some(candidate) = existing_shelf_candidate(
+                        sheet_index,
+                        shelf_index,
+                        eff_w,
+                        sheet_def.kerf,
+                        shelf,
+                        item,
+                    ) {
                         return Some(candidate);
                     }
                 }
@@ -157,9 +179,17 @@ fn choose_existing_shelf(
             .iter()
             .enumerate()
             .flat_map(|(sheet_index, sheet)| {
-                let sheet_width = problem.sheets[sheet.stock_index].width;
+                let sheet_def = &problem.sheets[sheet.stock_index];
+                let (eff_w, _eff_h) = crate::two_d::model::effective_bounds(sheet_def);
                 sheet.shelves.iter().enumerate().filter_map(move |(shelf_index, shelf)| {
-                    existing_shelf_candidate(sheet_index, shelf_index, sheet_width, shelf, item)
+                    existing_shelf_candidate(
+                        sheet_index,
+                        shelf_index,
+                        eff_w,
+                        sheet_def.kerf,
+                        shelf,
+                        item,
+                    )
                 })
             })
             .min_by(compare_existing_candidates),
@@ -170,12 +200,18 @@ fn existing_shelf_candidate(
     sheet_index: usize,
     shelf_index: usize,
     sheet_width: u32,
+    sheet_kerf: u32,
     shelf: &Shelf,
     item: &ItemInstance2D,
 ) -> Option<ExistingShelfCandidate> {
+    // A non-empty shelf already has at least one placement, so the next
+    // placement needs a kerf gap. An empty shelf (used_width == 0) is
+    // flush against the sheet's left edge — no kerf there per D3.
+    let gap = if shelf.used_width == 0 { 0 } else { sheet_kerf };
     item.orientations()
         .filter(|(width, height, _)| {
-            *height <= shelf.height && shelf.used_width.saturating_add(*width) <= sheet_width
+            *height <= shelf.height
+                && shelf.used_width.saturating_add(gap).saturating_add(*width) <= sheet_width
         })
         .map(|(width, height, rotated)| ExistingShelfCandidate {
             sheet_index,
@@ -183,7 +219,8 @@ fn existing_shelf_candidate(
             width,
             height,
             rotated,
-            remaining_width: sheet_width.saturating_sub(shelf.used_width.saturating_add(width)),
+            remaining_width: sheet_width
+                .saturating_sub(shelf.used_width.saturating_add(gap).saturating_add(width)),
         })
         .min_by(compare_existing_candidates)
 }
@@ -223,18 +260,21 @@ fn new_shelf_candidate(
     item: &ItemInstance2D,
 ) -> Option<NewShelfCandidate> {
     let sheet_def = &problem.sheets[sheet.stock_index];
-    let y = sheet_height(sheet);
+    let base_y = sheet_height(sheet);
+    // First shelf sits flush against the sheet's top edge; every
+    // subsequent shelf needs a kerf gap above it.
+    let gap = if base_y == 0 { 0 } else { sheet_def.kerf };
+    let y = base_y.saturating_add(gap);
 
+    let (eff_w, eff_h) = crate::two_d::model::effective_bounds(sheet_def);
     item.orientations()
-        .filter(|(width, height, _)| {
-            *width <= sheet_def.width && y.saturating_add(*height) <= sheet_def.height
-        })
+        .filter(|(width, height, _)| *width <= eff_w && y.saturating_add(*height) <= eff_h)
         .map(|(width, height, rotated)| NewShelfCandidate {
             sheet_index,
             width,
             height,
             rotated,
-            remaining_width: sheet_def.width.saturating_sub(width),
+            remaining_width: eff_w.saturating_sub(width),
             y,
         })
         .min_by(compare_new_shelf_candidates)
@@ -253,14 +293,15 @@ fn choose_new_sheet(
             sheet.quantity.map(|quantity| usage_counts[*stock_index] < quantity).unwrap_or(true)
         })
         .flat_map(|(stock_index, sheet)| {
+            let (eff_w, eff_h) = crate::two_d::model::effective_bounds(sheet);
             item.orientations()
-                .filter(move |(width, height, _)| *width <= sheet.width && *height <= sheet.height)
+                .filter(move |(width, height, _)| *width <= eff_w && *height <= eff_h)
                 .map(move |(width, height, rotated)| NewSheetCandidate {
                     stock_index,
                     width,
                     height,
                     rotated,
-                    waste: u64::from(sheet.width) * u64::from(sheet.height)
+                    waste: u64::from(eff_w) * u64::from(eff_h)
                         - u64::from(width) * u64::from(height),
                     cost: sheet.cost,
                 })
@@ -270,12 +311,14 @@ fn choose_new_sheet(
 
 fn place_on_existing_shelf(
     sheet: &mut SheetState,
+    sheet_kerf: u32,
     item: &ItemInstance2D,
     candidate: ExistingShelfCandidate,
 ) {
     let shelf = &mut sheet.shelves[candidate.shelf_index];
-    let x = shelf.used_width;
-    shelf.used_width = shelf.used_width.saturating_add(candidate.width);
+    let gap = if shelf.used_width == 0 { 0 } else { sheet_kerf };
+    let x = shelf.used_width.saturating_add(gap);
+    shelf.used_width = x.saturating_add(candidate.width);
 
     sheet.placements.push(Placement2D {
         name: item.name.clone(),
@@ -382,6 +425,8 @@ mod tests {
                 height: 8,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -437,6 +482,8 @@ mod tests {
                 height: 4,
                 cost: 1.0,
                 quantity: Some(1),
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -466,5 +513,36 @@ mod tests {
         assert_eq!(nfdh.unplaced.len(), 1);
         assert_eq!(ffdh.unplaced.len(), 1);
         assert_eq!(bfdh.unplaced.len(), 1);
+    }
+
+    #[test]
+    fn shelf_edge_relief_packs_two_pieces_on_one_sheet_with_overrun() {
+        let problem = TwoDProblem {
+            sheets: vec![Sheet2D {
+                name: "s".into(),
+                width: 48,
+                height: 10,
+                cost: 1.0,
+                quantity: None,
+                kerf: 1,
+                edge_kerf_relief: true,
+            }],
+            demands: vec![RectDemand2D {
+                name: "p".into(),
+                width: 24,
+                height: 10,
+                quantity: 2,
+                can_rotate: false,
+            }],
+        };
+
+        let solution = solve_nfdh(&problem, &TwoDOptions::default()).expect("shelf should solve");
+
+        assert_eq!(solution.sheet_count, 1);
+        let sheet = &solution.layouts[0];
+        assert_eq!(sheet.placements.len(), 2);
+        let max_right =
+            sheet.placements.iter().map(|p| p.x + p.width).max().expect("placements nonempty");
+        assert_eq!(max_right, 49);
     }
 }

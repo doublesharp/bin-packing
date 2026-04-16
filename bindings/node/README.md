@@ -37,13 +37,27 @@ const cuts = solve1d(
 // 2D sheet packing
 const sheets = solve2d(
   {
-    sheets: [{ name: 'plywood', width: 96, height: 48 }],
+    sheets: [{ name: 'plywood', width: 96, height: 48, kerf: 2 }],
     demands: [
       { name: 'panel', width: 24, height: 18, quantity: 4, can_rotate: true },
     ],
   },
-  { algorithm: 'auto' },
+  { algorithm: 'auto', min_usable_side: 12 },
 );
+
+// 2D cut plan — generate an ordered cut sequence from a finished layout
+const { plan2dCuts } = require('@0xdoublesharp/bin-packing');
+
+const cutPlan = plan2dCuts(
+  sheets,
+  { preset: 'table_saw' },
+);
+
+// cutPlan.total_cost — aggregate cost for all sheets under the chosen preset
+// cutPlan.sheet_plans — array of per-sheet plans; each carries:
+//   .steps        — ordered array of cut steps (cut, rotate, fence_reset, …)
+//   .total_cost   — cost for this sheet
+//   .num_cuts, .num_rotations, .num_fence_resets, .num_tool_ups, .travel_distance
 
 // 3D box packing
 const bins = solve3d(
@@ -61,7 +75,49 @@ const bins = solve3d(
 All three functions accept a problem object and an optional options object,
 and return a solution object. Full TypeScript types are included.
 
+### Edge kerf relief
+
+Set `edge_kerf_relief: true` on a sheet when the final cut on each
+axis can run off the stock, consuming less than a full kerf of
+material:
+
+```js
+sheets: [
+  {
+    name: 'plywood',
+    width: 48000,
+    height: 96000,
+    kerf: 125,
+    edge_kerf_relief: true,
+  },
+];
+```
+
+Each part must still fit within the sheet's own dimensions, but the
+last placement on a row or column may extend by up to one kerf past
+the sheet boundary — the model treats this as the blade exiting the
+material.
+
 ## API
+
+### `plan2dCuts(solution, options?)`
+
+Generates an ordered cut plan for every sheet in a finished `TwoDSolution`.
+Presets: `table_saw`, `panel_saw`, `cnc_router`.
+
+The returned plan carries per-sheet steps and a `total_cost`. Each sheet plan
+includes an ordered `steps` array and counters for cuts, rotations, fence
+resets, tool ups, and travel distance.
+
+Throws when `table_saw` or `panel_saw` is used on a non-guillotine layout
+(`NonGuillotineNotCuttable`) or when a cost override is invalid
+(`InvalidOptions`). Use `cnc_router` as the universal fallback.
+
+### `plan1dCuts(solution, options?)`
+
+Generates an ordered cut plan for every bar in a finished `OneDSolution`.
+The only preset is `chop_saw`. The returned plan carries per-bar steps
+(`cut` and `fence_reset`) and a `total_cost`.
 
 ### `solve1d(problem, options?)`
 
@@ -77,7 +133,7 @@ Algorithms: `auto`, `max_rects`, `max_rects_best_short_side_fit`,
 `guillotine_shorter_leftover_axis`, `guillotine_longer_leftover_axis`,
 `guillotine_min_area_split`, `guillotine_max_area_split`,
 `next_fit_decreasing_height`, `first_fit_decreasing_height`,
-`best_fit_decreasing_height`, `multi_start`.
+`best_fit_decreasing_height`, `multi_start`, `rotation_search`.
 
 ### `solve3d(problem, options?)`
 

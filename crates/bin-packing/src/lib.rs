@@ -89,6 +89,8 @@
 //!         height: 48,
 //!         cost: 1.0,
 //!         quantity: None,
+//!         kerf: 0,
+//!         edge_kerf_relief: false,
 //!     }],
 //!     demands: vec![RectDemand2D {
 //!         name: "panel".into(),
@@ -110,6 +112,7 @@
 #![warn(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
+pub mod cut_plan;
 mod error;
 #[cfg(feature = "one-d")]
 pub mod one_d;
@@ -121,4 +124,5 @@ pub mod two_d;
 #[cfg(feature = "three-d")]
 pub mod three_d;
 
+pub use cut_plan::CutPlanError;
 pub use error::{BinPackingError, Result};

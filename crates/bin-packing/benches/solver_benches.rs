@@ -57,46 +57,64 @@ fn benchmark_two_d(c: &mut Criterion) {
     let mut group = c.benchmark_group("solve_2d");
 
     for count in [16_usize, 32, 64] {
-        let problem = TwoDProblem {
-            sheets: vec![Sheet2D {
-                name: "sheet".to_string(),
-                width: 120,
-                height: 96,
-                cost: 1.0,
-                quantity: None,
-            }],
-            demands: (0..count)
-                .map(|index| RectDemand2D {
-                    name: format!("panel_{index}"),
-                    width: 10 + ((index * 5) % 28) as u32,
-                    height: 8 + ((index * 11) % 20) as u32,
-                    quantity: 1 + (index % 2),
-                    can_rotate: index % 3 != 0,
-                })
-                .collect(),
-        };
+        // Benchmark with kerf = 0 (pre-kerf-aware baseline) and kerf = 2
+        // (table-saw-scale) so regressions introduced by kerf enforcement
+        // are visible against the historical record.
+        for kerf in [0_u32, 2] {
+            // Benchmark with min_usable_side = 0 (baseline) and min_usable_side = 4
+            // so regressions introduced by drop-filtering are visible separately.
+            for min_usable_side in [0_u32, 4] {
+                let problem = TwoDProblem {
+                    sheets: vec![Sheet2D {
+                        name: "sheet".to_string(),
+                        width: 120,
+                        height: 96,
+                        cost: 1.0,
+                        quantity: None,
+                        kerf,
+                        edge_kerf_relief: false,
+                    }],
+                    demands: (0..count)
+                        .map(|index| RectDemand2D {
+                            name: format!("panel_{index}"),
+                            width: 10 + ((index * 5) % 28) as u32,
+                            height: 8 + ((index * 11) % 20) as u32,
+                            quantity: 1 + (index % 2),
+                            can_rotate: index % 3 != 0,
+                        })
+                        .collect(),
+                };
 
-        let item_count = problem.demands.iter().map(|item| item.quantity).sum::<usize>();
-        group.throughput(Throughput::Elements(item_count as u64));
-        for algorithm in [
-            TwoDAlgorithm::MaxRects,
-            TwoDAlgorithm::Skyline,
-            TwoDAlgorithm::Guillotine,
-            TwoDAlgorithm::Auto,
-        ] {
-            group.bench_with_input(
-                BenchmarkId::new(format!("{algorithm:?}"), count),
-                &problem,
-                |bench, problem| {
-                    bench.iter(|| {
-                        let _ = solve_2d(
-                            black_box(problem.clone()),
-                            TwoDOptions { algorithm, seed: Some(17), ..TwoDOptions::default() },
-                        )
-                        .expect("bench solve_2d should succeed");
-                    });
-                },
-            );
+                let item_count = problem.demands.iter().map(|item| item.quantity).sum::<usize>();
+                group.throughput(Throughput::Elements(item_count as u64));
+                for algorithm in [
+                    TwoDAlgorithm::MaxRects,
+                    TwoDAlgorithm::Skyline,
+                    TwoDAlgorithm::Guillotine,
+                    TwoDAlgorithm::Auto,
+                ] {
+                    let kerf_tag = if kerf == 0 { "" } else { "_kerf" };
+                    let drops_tag = if min_usable_side == 0 { "" } else { "_drops" };
+                    group.bench_with_input(
+                        BenchmarkId::new(format!("{algorithm:?}{kerf_tag}{drops_tag}"), count),
+                        &problem,
+                        |bench, problem| {
+                            bench.iter(|| {
+                                let _ = solve_2d(
+                                    black_box(problem.clone()),
+                                    TwoDOptions {
+                                        algorithm,
+                                        seed: Some(17),
+                                        min_usable_side,
+                                        ..TwoDOptions::default()
+                                    },
+                                )
+                                .expect("bench solve_2d should succeed");
+                            });
+                        },
+                    );
+                }
+            }
         }
     }
 

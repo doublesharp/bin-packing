@@ -36,6 +36,41 @@ pub fn solve3d(problem_json: String, options_json: Option<String>) -> napi::Resu
 }
 
 #[napi]
+#[cfg(feature = "one-d")]
+pub fn plan1d_cuts(
+    problem_json: String,
+    solution_json: String,
+    options_json: Option<String>,
+) -> napi::Result<String> {
+    use bin_packing::one_d::cut_plan::{CutPlanOptions1D, plan_cuts};
+    use bin_packing::one_d::{OneDProblem, OneDSolution};
+    let problem = parse_json::<OneDProblem>(&problem_json)?;
+    let solution = parse_json::<OneDSolution>(&solution_json)?;
+    let options = options_json
+        .as_deref()
+        .map(parse_json::<CutPlanOptions1D>)
+        .transpose()?
+        .unwrap_or_default();
+    let cut_plan = plan_cuts(&problem, &solution, &options).map_err(to_napi_error)?;
+    serde_json::to_string(&cut_plan).map_err(to_napi_error)
+}
+
+#[napi]
+#[cfg(feature = "two-d")]
+pub fn plan2d_cuts(solution_json: String, options_json: Option<String>) -> napi::Result<String> {
+    use bin_packing::two_d::TwoDSolution;
+    use bin_packing::two_d::cut_plan::{CutPlanOptions2D, plan_cuts};
+    let solution = parse_json::<TwoDSolution>(&solution_json)?;
+    let options = options_json
+        .as_deref()
+        .map(parse_json::<CutPlanOptions2D>)
+        .transpose()?
+        .unwrap_or_default();
+    let cut_plan = plan_cuts(&solution, &options).map_err(to_napi_error)?;
+    serde_json::to_string(&cut_plan).map_err(to_napi_error)
+}
+
+#[napi]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }

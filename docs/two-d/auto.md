@@ -7,8 +7,8 @@ ensemble is narrowed to guillotine-compatible algorithms only.
 
 ## Default ensemble (`guillotine_required = false`)
 
-Auto runs the following ten constructions in order and keeps whichever is
-best under `is_better_than`:
+Auto runs the following eleven constructions in order and keeps whichever
+is best under `is_better_than`:
 
 1. [`max_rects`](max-rects.md#max_rects--best-area-fit-baf) — Best-Area-Fit MaxRects. Seed the `best` slot.
 2. [`max_rects_best_short_side_fit`](max-rects.md#max_rects_best_short_side_fit--best-short-side-fit-bssf) — BSSF MaxRects.
@@ -20,6 +20,7 @@ best under `is_better_than`:
 8. [`guillotine_best_short_side_fit`](guillotine.md#guillotine_best_short_side_fit--bssf--beamboth) — Guillotine BSSF (beam-both).
 9. [`guillotine_shorter_leftover_axis`](guillotine.md#guillotine_shorter_leftover_axis--baf--slas) — Guillotine BAF+SLAS.
 10. [`multi_start`](multi-start.md) — Multistart MaxRects (honors `seed`).
+11. [`rotation_search`](rotation-search.md) — Exhaustive or sampled rotation assignment search (honors `seed`).
 
 The ensemble is deliberately curated to cover several failure modes:
 
@@ -36,6 +37,8 @@ The ensemble is deliberately curated to cover several failure modes:
   geometry, often winning on workloads with many similar-size items.
 - **MultiStart** gives the ensemble access to non-greedy BAF runs that
   explore the tie-ordering neighborhood.
+- **RotationSearch** explores the global rotation assignment landscape,
+  catching workloads where greedy per-placement rotation is suboptimal.
 
 **Not in the default ensemble** (reachable only via explicit selection):
 
@@ -76,12 +79,15 @@ Every candidate is compared against the current best via
 comparator:
 
 ```
-(unplaced.len(), sheet_count, total_waste_area, total_cost)
+(unplaced.len(), sheet_count, total_waste_area, total_cost,
+ Reverse(max_usable_drop_area), Reverse(total_sum_sq_usable_drop_areas))
 ```
 
-See [2D overview — ranking](README.md#solution-ranking). The comparator
-is stable: if two candidates produce identical tuples, the earlier one
-in the ensemble order wins.
+See [2D overview — ranking](README.md#solution-ranking). The two
+consolidation keys (drop area, sum-of-squares) only reorder candidates
+that are already equal on every primary key. The comparator is stable:
+if two candidates produce identical tuples, the earlier one in the
+ensemble order wins.
 
 ## Options inherited from the ensemble members
 
@@ -89,10 +95,12 @@ in the ensemble order wins.
   in the ensemble.
 - **`multistart_runs`** (default `12`) — passed to `multi_start`. Not
   used by the single-run families.
-- **`seed`** — passed to `multi_start`, which is the only randomized
-  family in the ensemble. When `seed = None`, `multi_start` falls back
-  to its internal constant so the Auto run is still reproducible
-  across processes.
+- **`auto_rotation_search_max_types`** (default `16`) — passed to
+  `rotation_search`; controls the exhaustive-vs-sampled threshold.
+- **`seed`** — passed to `multi_start` and `rotation_search`, the two
+  randomized families in the ensemble. When `seed = None`, both fall
+  back to their internal constants so the Auto run is still
+  reproducible across processes.
 
 The `guillotine_required` flag is consumed directly by Auto itself to
 route the dispatch path.
@@ -100,7 +108,7 @@ route the dispatch path.
 ## Complexity
 
 Auto's cost is the sum of its ensemble members. The default ensemble
-runs ten constructions; the guillotine-required ensemble runs seven.
+runs eleven constructions; the guillotine-required ensemble runs seven.
 On a medium instance (several hundred items) Auto typically takes
 tens to hundreds of milliseconds. For latency-sensitive callers that
 want a single specific algorithm, bypass Auto and call the

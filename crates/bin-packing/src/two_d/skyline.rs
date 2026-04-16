@@ -3,7 +3,8 @@ use std::cmp::Ordering;
 use crate::Result;
 
 use super::model::{
-    ItemInstance2D, Placement2D, SolverMetrics2D, TwoDOptions, TwoDProblem, TwoDSolution,
+    ItemInstance2D, Placement2D, Sheet2D, SolverMetrics2D, TwoDOptions, TwoDProblem, TwoDSolution,
+    effective_bounds,
 };
 
 #[derive(Debug, Clone)]
@@ -40,19 +41,20 @@ enum SkylineStrategy {
     MinWaste,
 }
 
-pub(super) fn solve_skyline(problem: &TwoDProblem, _options: &TwoDOptions) -> Result<TwoDSolution> {
-    solve_with_strategy(problem, SkylineStrategy::BottomLeft, "skyline")
+pub(super) fn solve_skyline(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDSolution> {
+    solve_with_strategy(problem, options, SkylineStrategy::BottomLeft, "skyline")
 }
 
 pub(super) fn solve_skyline_min_waste(
     problem: &TwoDProblem,
-    _options: &TwoDOptions,
+    options: &TwoDOptions,
 ) -> Result<TwoDSolution> {
-    solve_with_strategy(problem, SkylineStrategy::MinWaste, "skyline_min_waste")
+    solve_with_strategy(problem, options, SkylineStrategy::MinWaste, "skyline_min_waste")
 }
 
 fn solve_with_strategy(
     problem: &TwoDProblem,
+    options: &TwoDOptions,
     strategy: SkylineStrategy,
     algorithm: &str,
 ) -> Result<TwoDSolution> {
@@ -71,15 +73,17 @@ fn solve_with_strategy(
 
     for item in items {
         if let Some(candidate) = choose_existing_candidate(problem, &sheets, &item, strategy) {
-            place_candidate(&mut sheets[candidate.sheet_index], &item, candidate);
+            let sheet_def = &problem.sheets[sheets[candidate.sheet_index].stock_index];
+            place_candidate(sheet_def, &mut sheets[candidate.sheet_index], &item, candidate);
             continue;
         }
 
         if let Some(new_sheet) = choose_new_sheet(problem, &item, &usage_counts, strategy) {
             let sheet = &problem.sheets[new_sheet.stock_index];
+            let (eff_w, _eff_h) = effective_bounds(sheet);
             let mut state = SheetState {
                 stock_index: new_sheet.stock_index,
-                nodes: vec![SkylineNode { x: 0, y: 0, width: sheet.width }],
+                nodes: vec![SkylineNode { x: 0, y: 0, width: eff_w }],
                 placements: Vec::new(),
             };
 
@@ -98,7 +102,7 @@ fn solve_with_strategy(
                 waste: 0,
             };
 
-            place_candidate(&mut state, &item, candidate);
+            place_candidate(sheet, &mut state, &item, candidate);
             sheets.push(state);
             usage_counts[new_sheet.stock_index] =
                 usage_counts[new_sheet.stock_index].saturating_add(1);
@@ -121,6 +125,7 @@ fn solve_with_strategy(
             explored_states: 0,
             notes: vec![strategy.note().to_string()],
         },
+        options.min_usable_side,
     ))
 }
 
@@ -178,8 +183,9 @@ fn choose_new_sheet(
             sheet.quantity.map(|quantity| usage_counts[*index] < quantity).unwrap_or(true)
         })
         .flat_map(|(stock_index, sheet)| {
+            let (eff_w, eff_h) = effective_bounds(sheet);
             item.orientations()
-                .filter(move |(width, height, _)| sheet.width >= *width && sheet.height >= *height)
+                .filter(move |(width, height, _)| eff_w >= *width && eff_h >= *height)
                 .map(move |(width, height, rotated)| NewSheetCandidate {
                     stock_index,
                     width,
@@ -227,8 +233,9 @@ fn skyline_fit(
     height: u32,
 ) -> Option<SkylineFit> {
     let sheet_def = &problem.sheets[sheet.stock_index];
+    let (eff_w, eff_h) = effective_bounds(sheet_def);
     let x = sheet.nodes[node_index].x;
-    if x.saturating_add(width) > sheet_def.width {
+    if x.saturating_add(width) > eff_w {
         return None;
     }
 
@@ -241,7 +248,7 @@ fn skyline_fit(
     while width_left > 0 {
         let node = &sheet.nodes[index];
         y = y.max(node.y);
-        if y.saturating_add(height) > sheet_def.height {
+        if y.saturating_add(height) > eff_h {
             return None;
         }
 
@@ -253,6 +260,55 @@ fn skyline_fit(
         index += 1;
         if index >= sheet.nodes.len() {
             return None;
+        }
+    }
+
+    // Kerf-adjacency guard.
+    //
+    // The skyline's monotone data structure only records raised-top y per
+    // column; it does not remember each placement's full body y-range.
+    // A new placement might land with an x-gap < kerf against an existing
+    // placement on the same sheet, if that placement was placed to the
+    // right with its LEFT edge just past this placement's right edge (the
+    // right-inflation on the old placement doesn't reserve any x-gap on
+    // its OWN left side).
+    //
+    // Guard by scanning the sheet's existing placements directly: reject
+    // the fit if any existing placement shares a y-range overlap with the
+    // new placement and sits within `kerf` units of either side on x.
+    let kerf = sheet_def.kerf;
+    if kerf > 0 {
+        let new_left = x;
+        let new_right = x.saturating_add(width);
+        let new_top = y;
+        let new_bottom = y.saturating_add(height);
+        for existing in &sheet.placements {
+            let e_left = existing.x;
+            let e_right = existing.x.saturating_add(existing.width);
+            let e_top = existing.y;
+            let e_bottom = existing.y.saturating_add(existing.height);
+
+            // y-ranges must physically overlap for an x-gap violation to
+            // matter.
+            let y_overlap = new_top < e_bottom && e_top < new_bottom;
+            if !y_overlap {
+                continue;
+            }
+
+            // x-ranges must NOT overlap (the skyline first-pass already
+            // prevents mutual x-overlap at the footprint). But if the gap
+            // is less than kerf, reject.
+            let x_gap = if new_right <= e_left {
+                e_left - new_right
+            } else if e_right <= new_left {
+                new_left - e_right
+            } else {
+                // x-overlap: caller would double-place. Reject.
+                return None;
+            };
+            if x_gap < kerf {
+                return None;
+            }
         }
     }
 
@@ -279,7 +335,12 @@ fn skyline_fit(
     Some(SkylineFit { y, wasted_area })
 }
 
-fn place_candidate(sheet: &mut SheetState, item: &ItemInstance2D, candidate: Candidate) {
+fn place_candidate(
+    sheet_def: &Sheet2D,
+    sheet: &mut SheetState,
+    item: &ItemInstance2D,
+    candidate: Candidate,
+) {
     sheet.placements.push(Placement2D {
         name: item.name.clone(),
         x: candidate.x,
@@ -289,13 +350,24 @@ fn place_candidate(sheet: &mut SheetState, item: &ItemInstance2D, candidate: Can
         rotated: candidate.rotated,
     });
 
+    // Record a raised node that extends kerf to the right and kerf upward
+    // (clipped to the sheet), so any subsequent placement landing on this
+    // node is automatically at least kerf away from the one we just placed.
+    let (eff_w, eff_h) = effective_bounds(sheet_def);
+    let right_extent =
+        candidate.x.saturating_add(candidate.width).saturating_add(sheet_def.kerf).min(eff_w);
+    let raised_width = right_extent.saturating_sub(candidate.x);
+    let raised_top =
+        candidate.y.saturating_add(candidate.height).saturating_add(sheet_def.kerf).min(eff_h);
+    let raised_height = raised_top.saturating_sub(candidate.y);
+
     add_skyline_level(
         &mut sheet.nodes,
         candidate.node_index,
         candidate.x,
         candidate.y,
-        candidate.width,
-        candidate.height,
+        raised_width,
+        raised_height,
     );
 }
 
@@ -403,6 +475,8 @@ mod tests {
                 height: 6,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "panel".to_string(),
@@ -427,6 +501,8 @@ mod tests {
                 height: 6,
                 cost: 1.0,
                 quantity: Some(1),
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "panel".to_string(),
@@ -451,6 +527,8 @@ mod tests {
                 height: 6,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "panel".to_string(),
@@ -481,6 +559,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "panel".to_string(),
@@ -521,6 +601,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -596,5 +678,37 @@ mod tests {
         assert_eq!(nodes[0].x, 0);
         assert_eq!(nodes[0].y, 5);
         assert_eq!(nodes[0].width, 2);
+    }
+
+    #[test]
+    fn skyline_edge_relief_packs_two_pieces_on_one_sheet_with_overrun() {
+        let problem = TwoDProblem {
+            sheets: vec![Sheet2D {
+                name: "s".into(),
+                width: 48,
+                height: 10,
+                cost: 1.0,
+                quantity: None,
+                kerf: 1,
+                edge_kerf_relief: true,
+            }],
+            demands: vec![RectDemand2D {
+                name: "p".into(),
+                width: 24,
+                height: 10,
+                quantity: 2,
+                can_rotate: false,
+            }],
+        };
+
+        let solution =
+            solve_skyline(&problem, &TwoDOptions::default()).expect("skyline should solve");
+
+        assert_eq!(solution.sheet_count, 1);
+        let sheet = &solution.layouts[0];
+        assert_eq!(sheet.placements.len(), 2);
+        let max_right =
+            sheet.placements.iter().map(|p| p.x + p.width).max().expect("placements nonempty");
+        assert_eq!(max_right, 49);
     }
 }

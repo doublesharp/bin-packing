@@ -72,11 +72,129 @@ bindings.
 - **Guillotine mode.** `guillotine_required = true` restricts the Auto
   strategy to guillotine-compatible constructions and sets
   `TwoDSolution.guillotine` on the result.
+- **Kerf-aware packing.** Each sheet type accepts an optional `kerf` gap (in
+  the same units as the sheet dimensions). The solver enforces the gap between
+  every pair of adjacent placements (factory edges are free; only internal cuts
+  consume kerf). The solution reports `kerf_area` per layout and
+  `total_kerf_area` across all sheets.
+- **Edge kerf relief.** Set `Sheet2D.edge_kerf_relief = true` to allow a
+  trailing placement to extend up to one `kerf` past the sheet boundary,
+  modeling a blade that exits the stock. Parts must still fit within the
+  declared sheet dimensions.
 - **Multistart search.** A randomized MaxRects meta-strategy (`multi_start`)
   permutes input orderings under a reproducible `seed`.
+- **Rotation search.** Exhaustive (or sampled) rotation assignment search
+  (`rotation_search`) enumerates all 2^k rotation assignments for k
+  rotatable demand types, finding globally better rotation choices than
+  greedy per-placement rotation.
+- **Usable-drop consolidation.** Set `TwoDOptions.min_usable_side` to
+  filter out narrow leftover strips that are too small to reuse. The
+  solver reports `SheetLayout2D.largest_usable_drop_area` (largest
+  maximal free rectangle meeting the threshold on that sheet),
+  `SheetLayout2D.sum_sq_usable_drop_areas` (sum of squares of all
+  qualifying drops on that sheet), and aggregates across the solution as
+  `TwoDSolution.max_usable_drop_area` (the MAX over all layouts, not the
+  sum) and `TwoDSolution.total_sum_sq_usable_drop_areas` (saturating sum
+  across layouts). Candidates that are equal on waste and cost are
+  tiebroken in favour of larger / more consolidated drops; this tiebreaker
+  sits AFTER `total_waste_area` and `total_cost` so waste and cost always
+  dominate.
 - **Integer-safe math.** Dimensions are widened to `u64` before area
   calculations; `u32 * u32` on dimensions is forbidden by the workspace
   lint policy.
+
+### Cut plans
+
+After solving, you can generate an ordered cut plan for any `OneDSolution` or
+`TwoDSolution`. The cut planner is a pure post-processor — it reads a finished
+layout and emits a per-bar or per-sheet sequence of `CutStep`s optimized for a
+chosen shop cost model. The solver is not re-run.
+
+**Entry points:**
+
+- `bin_packing::one_d::cut_plan::plan_cuts(&solution, &options) -> Result<CutPlanSolution1D, CutPlanError>`
+- `bin_packing::two_d::cut_plan::plan_cuts(&solution, &options) -> Result<CutPlanSolution2D, CutPlanError>`
+
+**Presets (1D):**
+
+| Preset | `cut_cost` | `fence_reset_cost` |
+| --- | --- | --- |
+| `ChopSaw` | 1.0 | 0.3 |
+
+**Presets (2D):**
+
+| Preset | `cut_cost` | `rotate_cost` | `fence_reset_cost` | `tool_up_down_cost` | `travel_cost` |
+| --- | --- | --- | --- | --- | --- |
+| `TableSaw` | 1.0 | 2.0 | 0.5 | — | — |
+| `PanelSaw` | 1.0 | 5.0 | 0.3 | — | — |
+| `CncRouter` | 1.0 | — | — | 0.2 | 0.01 |
+
+Any cost field on the options struct overrides the preset default. Pass
+`..CutPlanOptions2D::default()` to accept all preset defaults.
+
+**Output:**
+
+- `CutPlanSolution1D` — contains `bar_plans: Vec<BarCutPlan1D>` and a
+  solution-level `total_cost`. Each `BarCutPlan1D` carries:
+  - `steps: Vec<CutStep1D>` — ordered `Cut` and `FenceReset` steps.
+  - `total_cost`, `num_cuts`, `num_fence_resets`.
+- `CutPlanSolution2D` — contains `sheet_plans: Vec<SheetCutPlan2D>` and a
+  solution-level `total_cost`. Each `SheetCutPlan2D` carries:
+  - `steps: Vec<CutStep2D>` — ordered `Cut`, `Rotate`, `FenceReset`,
+    `ToolUp`, `ToolDown`, and `Travel` steps.
+  - `total_cost`, `num_cuts`, `num_rotations`, `num_fence_resets`,
+    `num_tool_ups`, `travel_distance`.
+
+Total cost is the linear sum:
+`num_cuts * cut_cost + num_rotations * rotate_cost + num_fence_resets * fence_reset_cost + num_tool_ups * tool_up_down_cost + travel_distance * travel_cost`.
+
+**Errors (`CutPlanError`, `#[non_exhaustive]`):**
+
+- `NonGuillotineNotCuttable { sheet_name }` — the layout cannot be expressed
+  as a sequence of full guillotine cuts, and the `TableSaw` or `PanelSaw`
+  preset was requested. Switch to `CncRouter` or re-solve with
+  `guillotine_required = true`.
+- `InvalidOptions(String)` — a cost field is negative, `NaN`, or infinite.
+
+**Quick example (Rust):**
+
+```rust
+use bin_packing::two_d::{
+    RectDemand2D, Sheet2D, TwoDAlgorithm, TwoDOptions, TwoDProblem, solve_2d,
+    cut_plan::{CutPlanOptions2D, CutPlanPreset2D, plan_cuts},
+};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let problem = TwoDProblem {
+        sheets: vec![Sheet2D {
+            name: "plywood".into(),
+            width: 96,
+            height: 48,
+            cost: 1.0,
+            quantity: None,
+            kerf: 2,
+        }],
+        demands: vec![
+            RectDemand2D { name: "panel-a".into(), width: 24, height: 18, quantity: 4, can_rotate: true },
+            RectDemand2D { name: "panel-b".into(), width: 12, height: 12, quantity: 6, can_rotate: true },
+        ],
+    };
+
+    let solution = solve_2d(problem, TwoDOptions { algorithm: TwoDAlgorithm::Auto, ..Default::default() })?;
+
+    let cut_plan = plan_cuts(
+        &solution,
+        &CutPlanOptions2D { preset: CutPlanPreset2D::TableSaw, ..Default::default() },
+    )?;
+
+    println!("total cut plan cost: {}", cut_plan.total_cost);
+    for sheet_plan in &cut_plan.sheet_plans {
+        println!("  {}: {} steps, cost {:.2}", sheet_plan.sheet_name, sheet_plan.steps.len(), sheet_plan.total_cost);
+    }
+
+    Ok(())
+}
+```
 
 ### Cross-cutting
 
@@ -218,10 +336,13 @@ Meta-strategies:
 | Name | Description |
 | ---- | ----------- |
 | `multi_start` | Randomized MaxRects meta-strategy. Runs `multistart_runs` restarts with permuted item orderings under `seed`. |
-| `auto` *(default)* | Runs MaxRects (best-area, BSSF, BLSF, contact), Skyline and Skyline-min-waste, BFDH, Guillotine BSSF and shorter-leftover-axis, and Multistart, then returns the best candidate. When `guillotine_required` is set, only the guillotine variants run. |
+| `rotation_search` | Exhaustive (or sampled) rotation assignment search: enumerates all 2^k rotation assignments for k rotatable demand types (or samples `multistart_runs` random assignments when k exceeds `auto_rotation_search_max_types`). Each assignment fixes rotations and packs via MaxRects best-area-fit. |
+| `auto` *(default)* | Runs MaxRects (best-area, BSSF, BLSF, contact), Skyline and Skyline-min-waste, BFDH, Guillotine BSSF and shorter-leftover-axis, Multistart, and RotationSearch, then returns the best candidate. When `guillotine_required` is set, only the guillotine variants run. |
 
 Solution ranking for 2D is lexicographic on
-`(unplaced, sheet_count, total_waste_area, total_cost)`. When
+`(unplaced, sheet_count, total_waste_area, total_cost, max_usable_drop_area↑, total_sum_sq_usable_drop_areas↑)`.
+The two consolidation keys (↑ = prefer larger) only reorder candidates that
+are already equal on every primary key; waste and cost always win. When
 `guillotine_required` is set, `auto` narrows its candidate set to the
 guillotine variants — the guillotine constraint is enforced by candidate
 selection, not by a ranking tie-break, so every candidate `auto` ranks is
@@ -233,7 +354,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bin-packing = "0.2"
+bin-packing = "0.3"
 ```
 
 The dimension modules expose three entry points:
@@ -362,6 +483,7 @@ fn main() -> bin_packing::Result<()> {
             height: 48,
             cost: 1.0,
             quantity: None,
+            kerf: 2,
         }],
         demands: vec![
             RectDemand2D {
@@ -425,6 +547,13 @@ fn main() -> bin_packing::Result<()> {
 - `cost`: per-unit cost of consuming one sheet of this type.
 - `quantity`: optional cap on the number of sheets of this type that may be
   used.
+- `kerf`: optional saw-blade kerf width (default `0`). The solver enforces
+  this gap between every pair of adjacent placements on the sheet; the gap
+  between a placement and the sheet edge is free (factory edge rule).
+- `edge_kerf_relief`: when `true`, the trailing placement on the sheet
+  may extend up to one `kerf` past the sheet's right and bottom edges,
+  modeling a cut that exits the stock (default `false`). Individual parts
+  must still fit within the sheet's declared dimensions.
 
 `RectDemand2D` fields:
 
@@ -439,14 +568,31 @@ fn main() -> bin_packing::Result<()> {
 - `beam_width`: beam width for the guillotine beam search backend.
 - `guillotine_required`: when `true`, forces guillotine-compatible layouts
   and restricts `auto` to guillotine variants.
+- `min_usable_side`: minimum side length (in the same units as sheet
+  dimensions) for a leftover drop to count as usable (default `0` — all
+  drops count). Raise this to ignore narrow strips that are too small to
+  reuse; the consolidation tiebreakers then favour solutions that leave
+  fewer but larger reusable offcuts.
+- `auto_rotation_search_max_types`: maximum number of rotatable demand types
+  for which rotation search uses exhaustive enumeration (default `16`). When
+  the number of rotatable types exceeds this threshold, rotation search
+  switches to sampling `multistart_runs` random assignments.
 - `seed`: optional RNG seed for reproducible randomized algorithms.
 
 `TwoDSolution` fields of interest:
 
 - `algorithm`, `guillotine`
-- `sheet_count`, `total_waste_area`, `total_cost`
+- `sheet_count`, `total_waste_area`, `total_kerf_area`, `total_cost`
+- `max_usable_drop_area`: the largest single usable drop area across all
+  layouts (MAX over layouts, not a sum). A drop qualifies when both its
+  sides are at least `min_usable_side`.
+- `total_sum_sq_usable_drop_areas`: saturating sum of `sum_sq_usable_drop_areas`
+  across all layouts. Higher values indicate better drop consolidation
+  (fewer but larger reusable offcuts).
 - `layouts`: per-sheet `SheetLayout2D` entries (sheet name, dimensions,
-  placements, used area, waste area).
+  placements, used area, waste area, `kerf_area` — the portion of
+  `waste_area` attributable to kerf gaps — `largest_usable_drop_area`,
+  and `sum_sq_usable_drop_areas`).
 - `placements`: each `Placement2D` carries `x`, `y`, `width`, `height`,
   and `rotated` (whether the rectangle was rotated from its declared
   orientation).
@@ -616,7 +762,7 @@ console.log(cutList.unplaced);
 
 const layout = binPacking.solve2d(
   {
-    sheets: [{ name: 'plywood', width: 96, height: 48 }],
+    sheets: [{ name: 'plywood', width: 96, height: 48, kerf: 2 }],
     demands: [
       { name: 'panel', width: 24, height: 18, quantity: 4, can_rotate: true }
     ]
@@ -697,7 +843,7 @@ reference and per-target usage examples.
 ```
 crates/bin-packing/          # core solver crate
   src/one_d/                 #   1D model, heuristics, and exact backend
-  src/two_d/                 #   2D model, MaxRects, Skyline, Guillotine, Shelf
+  src/two_d/                 #   2D model, MaxRects, Skyline, Guillotine, Shelf, RotationSearch
   src/three_d/               #   3D model, 29-algorithm catalog
   benches/solver_benches.rs  #   Criterion benchmarks (1D + 2D + 3D)
   tests/solver_regressions.rs

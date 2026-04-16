@@ -17,6 +17,16 @@ function solve3d(problem, options) {
   return JSON.parse(native.solve3D(JSON.stringify(problem), JSON.stringify(options ?? {})));
 }
 
+function plan1dCuts(problem, solution, options) {
+  if (!native.plan1DCuts) throw new Error('plan1dCuts is not available in this build (missing one-d feature)');
+  return JSON.parse(native.plan1DCuts(JSON.stringify(problem), JSON.stringify(solution), options != null ? JSON.stringify(options) : undefined));
+}
+
+function plan2dCuts(solution, options) {
+  if (!native.plan2DCuts) throw new Error('plan2dCuts is not available in this build (missing two-d feature)');
+  return JSON.parse(native.plan2DCuts(JSON.stringify(solution), options != null ? JSON.stringify(options) : undefined));
+}
+
 module.exports = {
   solve1d,
   solve2d,
@@ -24,5 +34,9 @@ module.exports = {
   solve1D: solve1d,
   solve2D: solve2d,
   solve3D: solve3d,
+  plan1dCuts,
+  plan2dCuts,
+  plan1d_cuts: plan1dCuts,
+  plan2d_cuts: plan2dCuts,
   version: native.version
 };

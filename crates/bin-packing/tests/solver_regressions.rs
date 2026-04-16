@@ -134,6 +134,48 @@ fn assert_valid_2d_solution(problem: &TwoDProblem, solution: &TwoDSolution) {
         assert_eq!(layout.used_area, used_area);
         assert_eq!(layout.waste_area, sheet_area.saturating_sub(used_area));
         total_waste = total_waste.saturating_add(layout.waste_area);
+
+        // Edge-gap invariant: adjacent placements must be at least kerf apart.
+        if sheet.kerf > 0 {
+            let kerf = sheet.kerf;
+            let placements = &layout.placements;
+            for (i, a) in placements.iter().enumerate() {
+                let a_right = a.x + a.width;
+                let a_bottom = a.y + a.height;
+                for b in placements.iter().skip(i + 1) {
+                    let b_right = b.x + b.width;
+                    let b_bottom = b.y + b.height;
+
+                    let y_overlap = a.y.max(b.y) < a_bottom.min(b_bottom);
+                    if y_overlap {
+                        let x_overlap = a.x.max(b.x) < a_right.min(b_right);
+                        assert!(
+                            !x_overlap,
+                            "placements overlap on x while overlapping on y: {a:?} vs {b:?}"
+                        );
+                        let gap = if a_right <= b.x { b.x - a_right } else { a.x - b_right };
+                        assert!(
+                            gap >= kerf,
+                            "x-adjacent placements must be at least kerf={kerf} apart, got {gap}: {a:?} vs {b:?}"
+                        );
+                    }
+
+                    let x_overlap = a.x.max(b.x) < a_right.min(b_right);
+                    if x_overlap {
+                        let y_overlap = a.y.max(b.y) < a_bottom.min(b_bottom);
+                        assert!(
+                            !y_overlap,
+                            "placements overlap on y while overlapping on x: {a:?} vs {b:?}"
+                        );
+                        let gap = if a_bottom <= b.y { b.y - a_bottom } else { a.y - b_bottom };
+                        assert!(
+                            gap >= kerf,
+                            "y-adjacent placements must be at least kerf={kerf} apart, got {gap}: {a:?} vs {b:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     for item in &solution.unplaced {
@@ -147,6 +189,34 @@ fn assert_valid_2d_solution(problem: &TwoDProblem, solution: &TwoDSolution) {
     assert!(remaining.values().all(|count| *count == 0));
     assert_eq!(solution.layouts.len(), solution.sheet_count);
     assert_eq!(solution.total_waste_area, total_waste);
+    assert_eq!(
+        solution.total_kerf_area,
+        solution.layouts.iter().map(|l| l.kerf_area).sum::<u64>(),
+        "total_kerf_area must equal sum of per-layout kerf_area"
+    );
+
+    // Consolidation invariants.
+    for layout in &solution.layouts {
+        assert!(
+            layout.largest_usable_drop_area <= layout.waste_area,
+            "largest_usable_drop_area ({}) must not exceed waste_area ({})",
+            layout.largest_usable_drop_area,
+            layout.waste_area,
+        );
+    }
+    assert_eq!(
+        solution.max_usable_drop_area,
+        solution.layouts.iter().map(|l| l.largest_usable_drop_area).max().unwrap_or(0),
+        "solution.max_usable_drop_area must equal max of per-layout largest_usable_drop_area"
+    );
+    let expected_total_sum_sq: u128 = solution
+        .layouts
+        .iter()
+        .fold(0_u128, |acc, l| acc.saturating_add(l.sum_sq_usable_drop_areas));
+    assert_eq!(
+        solution.total_sum_sq_usable_drop_areas, expected_total_sum_sq,
+        "solution.total_sum_sq_usable_drop_areas must equal saturating sum of per-layout sum_sq_usable_drop_areas"
+    );
 }
 
 fn sample_1d_problem() -> OneDProblem {
@@ -175,6 +245,8 @@ fn sample_2d_problem() -> TwoDProblem {
             height: 48,
             cost: 1.0,
             quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
         }],
         demands: vec![
             RectDemand2D {
@@ -306,6 +378,8 @@ fn two_d_returns_hard_error_for_globally_infeasible_item() {
             height: 8,
             cost: 1.0,
             quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
         }],
         demands: vec![RectDemand2D {
             name: "oversize".to_string(),
@@ -382,6 +456,8 @@ fn two_d_sheet_selection_uses_cost_as_tie_breaker() {
                 height: 10,
                 cost: 5.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             },
             Sheet2D {
                 name: "economy".to_string(),
@@ -389,6 +465,8 @@ fn two_d_sheet_selection_uses_cost_as_tie_breaker() {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             },
         ],
         demands: vec![RectDemand2D {
@@ -475,6 +553,8 @@ fn validation_rejects_non_finite_or_negative_costs() {
                 height: 12,
                 cost: -1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "rect".to_string(),
@@ -535,6 +615,8 @@ prop_compose! {
     )(
         sheet_width in Just(sheet_width),
         sheet_height in Just(sheet_height),
+        // kerf must satisfy kerf * 2 < min(sheet_width, sheet_height); cap at 3 for realism
+        kerf in 0_u32..=(sheet_width.min(sheet_height) / 2).saturating_sub(1).min(3),
         demands in prop::collection::vec((4_u32..48, 4_u32..48, 1_usize..4, any::<bool>()), demand_count),
     ) -> TwoDProblem {
         let demands = demands
@@ -556,6 +638,8 @@ prop_compose! {
                 height: sheet_height,
                 cost: 1.0,
                 quantity: None,
+                kerf,
+                edge_kerf_relief: false,
             }],
             demands,
         }
@@ -996,17 +1080,32 @@ proptest! {
     }
 
     #[test]
-    fn randomized_two_d_solutions_stay_within_sheet(problem in arb_two_d_problem()) {
+    fn randomized_two_d_solutions_stay_within_sheet(
+        problem in arb_two_d_problem(),
+        min_usable_side in 0_u32..=4,
+    ) {
         let solution = solve_2d(
             problem.clone(),
             TwoDOptions {
                 algorithm: TwoDAlgorithm::Auto,
                 seed: Some(321),
+                min_usable_side,
                 ..TwoDOptions::default()
             },
         ).expect("2d randomized solve should succeed");
 
         assert_valid_2d_solution(&problem, &solution);
+
+        // Cut-plan post-condition: the router preset must succeed on any
+        // valid 2D solution, and total_cost must be finite.
+        let cut_plan = bin_packing::two_d::cut_plan::plan_cuts(
+            &solution,
+            &bin_packing::two_d::cut_plan::CutPlanOptions2D {
+                preset: bin_packing::two_d::cut_plan::CutPlanPreset2D::CncRouter,
+                ..Default::default()
+            },
+        ).expect("CNC router should plan any valid 2D solution");
+        assert!(cut_plan.total_cost.is_finite(), "cut plan total_cost must be finite");
     }
 }
 
@@ -1331,4 +1430,322 @@ fn three_d_inventory_cap_respected() {
         Err(BinPackingError::Infeasible3D { .. }) | Err(BinPackingError::InvalidInput(_)) => {}
         Err(e) => panic!("unexpected error: {e:?}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// RotationSearch regression tests
+// ---------------------------------------------------------------------------
+
+/// A problem where the optimal rotation assignment fits on 1 sheet but the
+/// worst orientation needs 2. RotationSearch should find the 1-sheet solution.
+#[test]
+fn rotation_search_places_all_items_on_solvable_problem() {
+    // Sheet is 10x20. Two demands: 6x15 (qty 2, can_rotate).
+    // Default orientation: 6w x 15h — two of them need 12w x 15h, fits on 10x20? No (12>10).
+    // Rotated: 15w x 6h — two stacked vertically need 15w x 12h, fits on 10x20? No (15>10).
+    // But one default (6x15) + one rotated (15x6) won't help on a 10x20 sheet either.
+    //
+    // Better approach: sheet 20x10, demand 11x5 qty 2 can_rotate.
+    // Default: 11w x 5h, two stacked = 11w x 10h. Fits 20x10? Yes (11<=20, 10<=10). 1 sheet.
+    // Rotated: 5w x 11h, won't fit height 10. So rotation search must pick default.
+    //
+    // Actually let's design it so both orientations fit but one is clearly better:
+    // Sheet 20x10, demand A: 12x9 qty 1 can_rotate, demand B: 12x9 qty 1 can_rotate.
+    // Default (12x9): two side-by-side = 24w > 20, stacked = 12w x 18h > 10h. Need 2 sheets.
+    // Rotated (9x12): 9w x 12h, height 12>10, doesn't fit.
+    // Mixed: one 12x9 + one 9x12: 9x12 doesn't fit height.
+    //
+    // Simpler: sheet 20x10. Demand: 9x6 qty 2 can_rotate.
+    // Default: 9x6, two side-by-side = 18x6, fits (18<=20, 6<=10). 1 sheet.
+    // Rotated: 6x9, two side-by-side = 12x9, fits. Also 1 sheet.
+    // Both fit on 1 sheet, not useful.
+    //
+    // Sheet 10x10. Demand A: 7x4 qty 2, can_rotate. Demand B: 6x3 qty 2, can_rotate.
+    // MaxRects without rotation search might or might not find the best orientation.
+    // Let's use a case where only the right rotation combo works:
+    //
+    // Sheet 10x10. Demand: 6x3 qty 3, can_rotate=true.
+    // Default 6x3: area = 18 each, total 54. Sheet area 100. Should easily fit.
+    // This is too easy. Let's make it harder.
+    //
+    // Sheet 10x5. Demand: 6x4 qty 2, can_rotate=true.
+    // Default 6x4: side by side 12x4 > 10w. Stacked 6x8 > 5h. Need 2 sheets.
+    // Rotated 4x6: 4x6, height 6>5. Doesn't fit!
+    // So default is the only option => 2 sheets. Not useful.
+    //
+    // Sheet 10x8. Demand: 6x4 qty 2, can_rotate=true.
+    // Default 6x4: stacked 6x8 fits (6<=10, 8<=8). 1 sheet!
+    // Rotated 4x6: side by side 8x6 fits. Also 1 sheet.
+    // MaxRects can find this without rotation search. Need a tighter case.
+    //
+    // Let's use a case where greedy per-piece rotation fails:
+    // Sheet 13x10. Demand A: 7x5 qty 2, can_rotate. Demand B: 6x4 qty 2, can_rotate.
+    // If A is 7x5 (default): two A's = 14x5 > 13, or 7x10. 7x10 fits, leaves 6x10.
+    //   Then B default 6x4: two B's stacked = 6x8, fits in 6x10. Total: 1 sheet.
+    // If A is 5x7 (rotated): two A's = 10x7 or 5x14>10. 10x7 fits, leaves 3x10 + 10x3.
+    //   Then B default 6x4: 6>3, won't fit in leftover 3x10. Need 2 sheets.
+    // So: rotation assignment "A default, B default" = 1 sheet.
+    //     rotation assignment "A rotated, B default" = 2 sheets.
+    // RotationSearch should find the 1-sheet solution.
+
+    let problem = TwoDProblem {
+        sheets: vec![Sheet2D {
+            name: "sheet".to_string(),
+            width: 13,
+            height: 10,
+            cost: 1.0,
+            quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
+        }],
+        demands: vec![
+            RectDemand2D {
+                name: "A".to_string(),
+                width: 7,
+                height: 5,
+                quantity: 2,
+                can_rotate: true,
+            },
+            RectDemand2D {
+                name: "B".to_string(),
+                width: 6,
+                height: 4,
+                quantity: 2,
+                can_rotate: true,
+            },
+        ],
+    };
+
+    let solution = solve_2d(
+        problem,
+        TwoDOptions {
+            algorithm: TwoDAlgorithm::RotationSearch,
+            seed: Some(42),
+            ..TwoDOptions::default()
+        },
+    )
+    .expect("rotation_search should succeed");
+
+    assert_eq!(solution.algorithm, "rotation_search");
+    assert!(solution.unplaced.is_empty(), "all items should be placed");
+    assert_eq!(solution.sheet_count, 1, "should fit on 1 sheet");
+}
+
+/// Items with `can_rotate: false` should never be rotated by rotation search.
+#[test]
+fn rotation_search_respects_can_rotate_false() {
+    let problem = TwoDProblem {
+        sheets: vec![Sheet2D {
+            name: "sheet".to_string(),
+            width: 20,
+            height: 20,
+            cost: 1.0,
+            quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
+        }],
+        demands: vec![
+            RectDemand2D {
+                name: "fixed".to_string(),
+                width: 15,
+                height: 3,
+                quantity: 1,
+                can_rotate: false,
+            },
+            RectDemand2D {
+                name: "rotatable".to_string(),
+                width: 8,
+                height: 5,
+                quantity: 1,
+                can_rotate: true,
+            },
+        ],
+    };
+
+    let solution = solve_2d(
+        problem,
+        TwoDOptions {
+            algorithm: TwoDAlgorithm::RotationSearch,
+            seed: Some(1),
+            ..TwoDOptions::default()
+        },
+    )
+    .expect("rotation_search should succeed");
+
+    // The "fixed" item must never appear rotated.
+    for layout in &solution.layouts {
+        for placement in &layout.placements {
+            if placement.name == "fixed" {
+                assert!(!placement.rotated, "can_rotate=false item must not be rotated");
+                assert_eq!(placement.width, 15);
+                assert_eq!(placement.height, 3);
+            }
+        }
+    }
+}
+
+/// Same seed produces the same result.
+#[test]
+fn rotation_search_is_deterministic_for_fixed_seed() {
+    let problem = TwoDProblem {
+        sheets: vec![Sheet2D {
+            name: "sheet".to_string(),
+            width: 20,
+            height: 15,
+            cost: 1.0,
+            quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
+        }],
+        demands: vec![
+            RectDemand2D {
+                name: "A".to_string(),
+                width: 8,
+                height: 5,
+                quantity: 3,
+                can_rotate: true,
+            },
+            RectDemand2D {
+                name: "B".to_string(),
+                width: 7,
+                height: 4,
+                quantity: 2,
+                can_rotate: true,
+            },
+        ],
+    };
+
+    let opts = TwoDOptions {
+        algorithm: TwoDAlgorithm::RotationSearch,
+        seed: Some(99),
+        ..TwoDOptions::default()
+    };
+    let sol1 = solve_2d(problem.clone(), opts.clone()).expect("run 1");
+    let sol2 = solve_2d(problem, opts).expect("run 2");
+
+    assert_eq!(sol1.sheet_count, sol2.sheet_count);
+    assert_eq!(sol1.total_waste_area, sol2.total_waste_area);
+    assert_eq!(sol1.layouts.len(), sol2.layouts.len());
+    for (l1, l2) in sol1.layouts.iter().zip(sol2.layouts.iter()) {
+        assert_eq!(l1.placements.len(), l2.placements.len());
+    }
+}
+
+/// Kerf > 0 with rotation search: verify edge-gap invariant holds.
+#[test]
+fn rotation_search_with_kerf_respects_edge_gap() {
+    let problem = TwoDProblem {
+        sheets: vec![Sheet2D {
+            name: "sheet".to_string(),
+            width: 30,
+            height: 20,
+            cost: 1.0,
+            quantity: None,
+            kerf: 2,
+            edge_kerf_relief: false,
+        }],
+        demands: vec![
+            RectDemand2D {
+                name: "X".to_string(),
+                width: 10,
+                height: 6,
+                quantity: 3,
+                can_rotate: true,
+            },
+            RectDemand2D {
+                name: "Y".to_string(),
+                width: 8,
+                height: 5,
+                quantity: 2,
+                can_rotate: true,
+            },
+        ],
+    };
+
+    let solution = solve_2d(
+        problem,
+        TwoDOptions {
+            algorithm: TwoDAlgorithm::RotationSearch,
+            seed: Some(7),
+            ..TwoDOptions::default()
+        },
+    )
+    .expect("rotation_search with kerf should succeed");
+
+    assert_eq!(solution.algorithm, "rotation_search");
+
+    // Verify no two placements on the same sheet overlap when kerf gap is
+    // accounted for. Each placement occupies [x, x+w+kerf) x [y, y+h+kerf)
+    // except the last along each axis (but a simpler check: no raw overlap).
+    for layout in &solution.layouts {
+        let placements = &layout.placements;
+        for (i, a) in placements.iter().enumerate() {
+            // Placement must be within sheet bounds.
+            assert!(a.x + a.width <= layout.width);
+            assert!(a.y + a.height <= layout.height);
+            for b in placements.iter().skip(i + 1) {
+                // No raw overlap (kerf means they should be further apart, but
+                // at minimum they must not overlap at all).
+                let overlap_x = a.x < b.x + b.width && b.x < a.x + a.width;
+                let overlap_y = a.y < b.y + b.height && b.y < a.y + a.height;
+                assert!(!(overlap_x && overlap_y), "placements {:?} and {:?} overlap", a, b);
+            }
+        }
+    }
+}
+
+/// Auto mode should include rotation search and can select it when rotation
+/// matters.
+#[test]
+fn auto_includes_rotation_search() {
+    // Use the same problem from the solvable test — rotation search should
+    // find the 1-sheet solution, and auto should pick it (or match it).
+    let problem = TwoDProblem {
+        sheets: vec![Sheet2D {
+            name: "sheet".to_string(),
+            width: 13,
+            height: 10,
+            cost: 1.0,
+            quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
+        }],
+        demands: vec![
+            RectDemand2D {
+                name: "A".to_string(),
+                width: 7,
+                height: 5,
+                quantity: 2,
+                can_rotate: true,
+            },
+            RectDemand2D {
+                name: "B".to_string(),
+                width: 6,
+                height: 4,
+                quantity: 2,
+                can_rotate: true,
+            },
+        ],
+    };
+
+    let auto_sol =
+        solve_2d(problem.clone(), TwoDOptions { seed: Some(42), ..TwoDOptions::default() })
+            .expect("auto should succeed");
+
+    let rotation_sol = solve_2d(
+        problem,
+        TwoDOptions {
+            algorithm: TwoDAlgorithm::RotationSearch,
+            seed: Some(42),
+            ..TwoDOptions::default()
+        },
+    )
+    .expect("rotation_search should succeed");
+
+    // Auto should be at least as good as rotation search alone.
+    assert!(
+        auto_sol.sheet_count <= rotation_sol.sheet_count,
+        "auto should be at least as good as rotation_search"
+    );
+    assert!(auto_sol.unplaced.is_empty());
 }

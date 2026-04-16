@@ -42,6 +42,7 @@ solution it found with an LP lower bound.
 | Guillotine beam search (7 variants) | [two-d/guillotine.md](two-d/guillotine.md) | Yes | No |
 | Shelf heuristics — NFDH / FFDH / BFDH | [two-d/shelf.md](two-d/shelf.md) | Layout yes; flag false | No |
 | Multistart MaxRects | [two-d/multi-start.md](two-d/multi-start.md) | No | Yes |
+| Rotation Search | [two-d/rotation-search.md](two-d/rotation-search.md) | No | Sampled: Yes |
 | Auto | [two-d/auto.md](two-d/auto.md) | Optional | Indirectly |
 
 ## 3D algorithms

@@ -82,6 +82,11 @@ export interface Sheet2D {
   height: number
   cost?: number
   quantity?: number | null
+  kerf?: number
+  /** When true, the trailing placement may extend up to one kerf past
+   *  the sheet's right and bottom edges, modeling a cut that runs off
+   *  the stock. Does not relax individual part size limits. Default: false. */
+  edge_kerf_relief?: boolean
 }
 
 export interface RectDemand2D {
@@ -102,6 +107,7 @@ export interface TwoDOptions {
   multistart_runs?: number
   beam_width?: number
   guillotine_required?: boolean
+  min_usable_side?: number
   seed?: number | null
 }
 
@@ -122,6 +128,9 @@ export interface SheetLayout2D {
   placements: Placement2D[]
   used_area: number
   waste_area: number
+  kerf_area: number
+  largest_usable_drop_area: number
+  sum_sq_usable_drop_areas: number
 }
 
 export interface SolverMetrics2D {
@@ -135,7 +144,10 @@ export interface TwoDSolution {
   guillotine: boolean
   sheet_count: number
   total_waste_area: number
+  total_kerf_area: number
   total_cost: number
+  max_usable_drop_area: number
+  total_sum_sq_usable_drop_areas: number
   layouts: SheetLayout2D[]
   unplaced: RectDemand2D[]
   metrics: SolverMetrics2D
@@ -232,10 +244,99 @@ export interface ThreeDSolution {
   metrics: SolverMetrics3D
 }
 
+// ---------------------------------------------------------------------------
+// Cut planning
+// ---------------------------------------------------------------------------
+
+export type CutPlanPreset1D = 'chop_saw'
+
+export interface CutPlanOptions1D {
+  preset?: CutPlanPreset1D
+  cut_cost?: number
+  fence_reset_cost?: number
+}
+
+export interface EffectiveCosts1D {
+  cut_cost: number
+  fence_reset_cost: number
+}
+
+export type CutStep1D =
+  | { kind: 'cut'; position: number; piece_name: string }
+  | { kind: 'fence_reset'; new_position: number }
+
+export interface BarCutPlan1D {
+  stock_name: string
+  bar_index_in_solution: number
+  total_cost: number
+  num_cuts: number
+  num_fence_resets: number
+  steps: CutStep1D[]
+}
+
+export interface CutPlanSolution1D {
+  preset: CutPlanPreset1D
+  effective_costs: EffectiveCosts1D
+  bar_plans: BarCutPlan1D[]
+  total_cost: number
+}
+
+export type CutPlanPreset2D = 'table_saw' | 'panel_saw' | 'cnc_router'
+
+export interface CutPlanOptions2D {
+  preset?: CutPlanPreset2D
+  cut_cost?: number
+  rotate_cost?: number
+  fence_reset_cost?: number
+  tool_up_down_cost?: number
+  travel_cost?: number
+}
+
+export interface EffectiveCosts2D {
+  cut_cost: number
+  rotate_cost: number
+  fence_reset_cost: number
+  tool_up_down_cost: number
+  travel_cost: number
+}
+
+export type CutAxis = 'vertical' | 'horizontal'
+
+export type CutStep2D =
+  | { kind: 'cut'; axis: CutAxis; position: number }
+  | { kind: 'rotate' }
+  | { kind: 'fence_reset'; new_position: number }
+  | { kind: 'tool_up' }
+  | { kind: 'tool_down' }
+  | { kind: 'travel'; to_x: number; to_y: number }
+
+export interface SheetCutPlan2D {
+  sheet_name: string
+  sheet_index_in_solution: number
+  total_cost: number
+  num_cuts: number
+  num_rotations: number
+  num_fence_resets: number
+  num_tool_ups: number
+  travel_distance: number
+  steps: CutStep2D[]
+}
+
+export interface CutPlanSolution2D {
+  preset: CutPlanPreset2D
+  effective_costs: EffectiveCosts2D
+  sheet_plans: SheetCutPlan2D[]
+  total_cost: number
+}
+
 export declare function solve1d(problem: OneDProblem, options?: OneDOptions): OneDSolution
 export declare function solve2d(problem: TwoDProblem, options?: TwoDOptions): TwoDSolution
 export declare function solve3d(problem: ThreeDProblem, options?: ThreeDOptions): ThreeDSolution
 export declare function solve1D(problem: OneDProblem, options?: OneDOptions): OneDSolution
 export declare function solve2D(problem: TwoDProblem, options?: TwoDOptions): TwoDSolution
 export declare function solve3D(problem: ThreeDProblem, options?: ThreeDOptions): ThreeDSolution
+export declare function plan1dCuts(problem: OneDProblem, solution: OneDSolution, options?: CutPlanOptions1D): CutPlanSolution1D
+export declare function plan2dCuts(solution: TwoDSolution, options?: CutPlanOptions2D): CutPlanSolution2D
+export declare function plan1d_cuts(problem: OneDProblem, solution: OneDSolution, options?: CutPlanOptions1D): CutPlanSolution1D
+export declare function plan2d_cuts(solution: TwoDSolution, options?: CutPlanOptions2D): CutPlanSolution2D
 export declare function version(): string

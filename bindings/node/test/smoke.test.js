@@ -58,3 +58,37 @@ test('solve2d packs a basic sheet layout', () => {
   assert.equal(solution.layouts[0].placements.length, 4, 'all four panels on one sheet');
   assert.ok(typeof solution.total_waste_area === 'number', 'waste area should be a number');
 });
+
+test('plan1dCuts generates a cut plan for a 1D solution', () => {
+  const problem = {
+    stock: [{ name: 'bar', length: 100, kerf: 2 }],
+    demands: [
+      { name: 'A', length: 30, quantity: 3 }
+    ]
+  };
+  const solution = binPacking.solve1d(problem, { algorithm: 'auto' });
+  const plan = binPacking.plan1dCuts(problem, solution);
+
+  assert.ok(typeof plan.total_cost === 'number', 'total_cost should be a number');
+  assert.ok(Array.isArray(plan.bar_plans), 'bar_plans should be an array');
+  assert.ok(plan.bar_plans.length > 0, 'should have at least one bar plan');
+  assert.equal(plan.preset, 'chop_saw', 'default preset should be chop_saw');
+  assert.ok(typeof plan.effective_costs.cut_cost === 'number', 'effective_costs.cut_cost should be a number');
+  assert.ok(Array.isArray(plan.bar_plans[0].steps), 'steps should be an array');
+});
+
+test('plan2dCuts generates a cut plan for a 2D solution', () => {
+  const solution = binPacking.solve2d(
+    {
+      sheets: [{ name: 'plywood', width: 10, height: 5 }],
+      demands: [{ name: 'panel', width: 5, height: 5, quantity: 2, can_rotate: false }]
+    },
+    { algorithm: 'guillotine' }
+  );
+  const plan = binPacking.plan2dCuts(solution);
+
+  assert.ok(typeof plan.total_cost === 'number', 'total_cost should be a number');
+  assert.ok(Array.isArray(plan.sheet_plans), 'sheet_plans should be an array');
+  assert.ok(plan.sheet_plans.length > 0, 'should have at least one sheet plan');
+  assert.equal(plan.preset, 'table_saw', 'default preset should be table_saw');
+});

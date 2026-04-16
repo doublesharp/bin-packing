@@ -3,6 +3,7 @@
 //! Provides heuristics (first-fit decreasing, best-fit decreasing, local search) and an
 //! exact backend (column generation with pattern-search refinement).
 
+pub mod cut_plan;
 mod exact;
 mod heuristics;
 mod model;

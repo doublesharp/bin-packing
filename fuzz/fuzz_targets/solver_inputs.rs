@@ -11,10 +11,12 @@ use bin_packing::three_d::{
     Bin3D, BoxDemand3D, RotationMask3D, ThreeDAlgorithm, ThreeDOptions, ThreeDProblem,
     ThreeDSolution, solve_3d,
 };
+use bin_packing::cut_plan::CutPlanError;
 use bin_packing::two_d::{
     Placement2D, RectDemand2D, Sheet2D, TwoDAlgorithm, TwoDOptions, TwoDProblem, TwoDSolution,
     solve_2d,
 };
+use bin_packing::two_d::cut_plan::{CutPlanOptions2D, CutPlanPreset2D, plan_cuts};
 use libfuzzer_sys::fuzz_target;
 
 // Keep problem sizes small so the beam search and exact backends stay fast enough
@@ -52,6 +54,8 @@ struct SheetSeed {
     height: u16,
     cost_units: u8,
     quantity: Option<u8>,
+    kerf: u8,
+    edge_kerf_relief: bool,
 }
 
 #[derive(Debug, Arbitrary)]
@@ -85,6 +89,8 @@ struct TwoDSeed {
     guillotine_required: bool,
     beam_width: u8,
     multistart_runs: u8,
+    min_usable_side: u8,
+    cut_plan_preset: u8,
 }
 
 #[derive(Debug, Arbitrary)]
@@ -157,6 +163,14 @@ fn map_two_d_algorithm(value: u8) -> TwoDAlgorithm {
         16 => TwoDAlgorithm::FirstFitDecreasingHeight,
         17 => TwoDAlgorithm::BestFitDecreasingHeight,
         _ => TwoDAlgorithm::MultiStart,
+    }
+}
+
+fn map_cut_plan_preset(value: u8) -> CutPlanPreset2D {
+    match value % 3 {
+        0 => CutPlanPreset2D::TableSaw,
+        1 => CutPlanPreset2D::PanelSaw,
+        _ => CutPlanPreset2D::CncRouter,
     }
 }
 
@@ -278,6 +292,8 @@ fn build_two_d_problem(seed: &TwoDSeed) -> TwoDProblem {
             height: 32,
             cost: 1.0,
             quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
         });
     }
 
@@ -288,6 +304,14 @@ fn build_two_d_problem(seed: &TwoDSeed) -> TwoDProblem {
         .iter()
         .map(|sheet| (sheet.width, sheet.height))
         .fold((u32::MAX, u32::MAX), |(min_w, min_h), (w, h)| (min_w.min(w), min_h.min(h)));
+    // For rotatable demands we clamp both sides to `min(min_width, min_height)`
+    // so that EITHER orientation fits the smallest sheet's width and height.
+    // Clamping width to `min_width` alone allows a demand to be
+    // `min_width × min_height` which, when rotated, becomes
+    // `min_height × min_width` — that rotated orientation cannot legally
+    // fit a sheet of exactly `min_width × min_height` unless both axes
+    // can accommodate the swapped dims.
+    let rotatable_side_cap = min_width.min(min_height);
 
     let demands = seed
         .demands
@@ -299,8 +323,11 @@ fn build_two_d_problem(seed: &TwoDSeed) -> TwoDProblem {
             let raw_height = u32::from(demand.height.max(1));
             // Force the rectangle into the bounding box that fits every sheet so
             // it's always placeable in at least one orientation.
-            let width = raw_width.min(min_width);
-            let height = raw_height.min(min_height);
+            let (width, height) = if demand.can_rotate {
+                (raw_width.min(rotatable_side_cap), raw_height.min(rotatable_side_cap))
+            } else {
+                (raw_width.min(min_width), raw_height.min(min_height))
+            };
             RectDemand2D {
                 name: format!("rect_{index}"),
                 width,
@@ -332,7 +359,23 @@ fn build_sheet(index: usize, seed: &SheetSeed) -> Sheet2D {
     let cost = 1.0 + f64::from(seed.cost_units % 8);
     let quantity = seed.quantity.map(|raw| usize::from(raw % ((MAX_AVAILABLE + 1) as u8)).max(1));
 
-    Sheet2D { name: format!("sheet_{index}"), width, height, cost, quantity }
+    // Clamp kerf to satisfy Sheet2D validation: kerf * 2 < min(width, height).
+    // The validator rejects >= min_side / 2, so cap at (min_side / 2) - 1. Cap
+    // further at a small constant to keep fuzzer inputs realistic and keep
+    // the free-space shrink per placement bounded.
+    let min_side = width.min(height);
+    let max_kerf = min_side.saturating_sub(1) / 2;
+    let kerf = (u32::from(seed.kerf) % 8).min(max_kerf);
+
+    Sheet2D {
+        name: format!("sheet_{index}"),
+        width,
+        height,
+        cost,
+        quantity,
+        kerf,
+        edge_kerf_relief: seed.edge_kerf_relief,
+    }
 }
 
 fn build_bin(index: usize, seed: BinSeed) -> Bin3D {
@@ -585,17 +628,36 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
         assert_placements_non_overlapping(&layout.placements);
 
         let mut used_area = 0_u64;
+        // Under edge_kerf_relief, the trailing placement may extend up to
+        // one kerf past the sheet's right and bottom edges. Without the
+        // flag, the strict bound applies.
+        let max_x = if sheet.edge_kerf_relief {
+            sheet.width.saturating_add(sheet.kerf)
+        } else {
+            sheet.width
+        };
+        let max_y = if sheet.edge_kerf_relief {
+            sheet.height.saturating_add(sheet.kerf)
+        } else {
+            sheet.height
+        };
         for placement in &layout.placements {
             let placement_right = placement.x.saturating_add(placement.width);
             let placement_bottom = placement.y.saturating_add(placement.height);
             assert!(
-                placement_right <= sheet.width,
-                "placement extends past sheet width: {placement:?} on sheet {}",
+                placement_right <= max_x,
+                "placement extends past effective sheet width: {placement:?} on sheet {} (max_x={max_x})",
                 sheet.name
             );
             assert!(
-                placement_bottom <= sheet.height,
-                "placement extends past sheet height: {placement:?} on sheet {}",
+                placement_bottom <= max_y,
+                "placement extends past effective sheet height: {placement:?} on sheet {} (max_y={max_y})",
+                sheet.name
+            );
+            // Parts themselves must always fit within sheet dims.
+            assert!(
+                placement.width <= sheet.width && placement.height <= sheet.height,
+                "placement dims exceed sheet: {placement:?} on sheet {}",
                 sheet.name
             );
             assert!(
@@ -628,8 +690,21 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
                 remaining.get_mut(&key).expect("declared demand should have a remaining counter");
             assert!(*entry > 0, "placement exceeds requested quantity");
             *entry -= 1;
-            used_area =
-                used_area.saturating_add(u64::from(placement.width) * u64::from(placement.height));
+            // Sum the on-sheet portion of each placement so this matches
+            // `from_layouts.used_area`, which clips to sheet bounds when
+            // `edge_kerf_relief` is on.
+            let on_sheet_w = placement
+                .x
+                .saturating_add(placement.width)
+                .min(sheet.width)
+                .saturating_sub(placement.x);
+            let on_sheet_h = placement
+                .y
+                .saturating_add(placement.height)
+                .min(sheet.height)
+                .saturating_sub(placement.y);
+            used_area = used_area
+                .saturating_add(u64::from(on_sheet_w) * u64::from(on_sheet_h));
         }
 
         assert_eq!(layout.used_area, used_area, "layout used_area mismatch");
@@ -640,6 +715,54 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
         );
         assert_eq!(layout.width, sheet.width, "layout cached width mismatch");
         assert_eq!(layout.height, sheet.height, "layout cached height mismatch");
+
+        // Kerf edge-gap invariant: when the sheet declares a non-zero kerf,
+        // edge-adjacent placements must be separated by at least `kerf` along
+        // the shared axis. Overlap on both axes is already caught by
+        // `assert_placements_non_overlapping` above.
+        if sheet.kerf > 0 {
+            let kerf = sheet.kerf;
+            let placements = &layout.placements;
+            for (i, a) in placements.iter().enumerate() {
+                let a_right = a.x.saturating_add(a.width);
+                let a_bottom = a.y.saturating_add(a.height);
+                for b in placements.iter().skip(i + 1) {
+                    let b_right = b.x.saturating_add(b.width);
+                    let b_bottom = b.y.saturating_add(b.height);
+
+                    let y_overlap = a.y.max(b.y) < a_bottom.min(b_bottom);
+                    if y_overlap {
+                        let gap = if a_right <= b.x {
+                            b.x - a_right
+                        } else if b_right <= a.x {
+                            a.x - b_right
+                        } else {
+                            0
+                        };
+                        assert!(
+                            gap >= kerf,
+                            "x-adjacent placements must be >= kerf={kerf} apart, got {gap}: {a:?} vs {b:?}"
+                        );
+                    }
+
+                    let x_overlap = a.x.max(b.x) < a_right.min(b_right);
+                    if x_overlap {
+                        let gap = if a_bottom <= b.y {
+                            b.y - a_bottom
+                        } else if b_bottom <= a.y {
+                            a.y - b_bottom
+                        } else {
+                            0
+                        };
+                        assert!(
+                            gap >= kerf,
+                            "y-adjacent placements must be >= kerf={kerf} apart, got {gap}: {a:?} vs {b:?}"
+                        );
+                    }
+                }
+            }
+        }
+
         total_waste = total_waste.saturating_add(layout.waste_area);
         *layout_counts_by_sheet.entry(layout.sheet_name.clone()).or_insert(0) += 1;
     }
@@ -658,6 +781,38 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
     );
     assert_eq!(solution.layouts.len(), solution.sheet_count);
     assert_eq!(solution.total_waste_area, total_waste);
+    assert_eq!(
+        solution.total_kerf_area,
+        solution.layouts.iter().map(|layout| layout.kerf_area).sum::<u64>(),
+        "total_kerf_area must equal sum of per-layout kerf_area",
+    );
+
+    // Consolidation-metric invariants: per-layout largest-drop bounded by
+    // waste, solution-level max aggregation matches per-layout maxes.
+    for layout in &solution.layouts {
+        assert!(
+            layout.largest_usable_drop_area <= layout.waste_area,
+            "largest_usable_drop_area {} exceeds waste_area {} on sheet {}",
+            layout.largest_usable_drop_area,
+            layout.waste_area,
+            layout.sheet_name,
+        );
+    }
+    let expected_max_drop =
+        solution.layouts.iter().map(|l| l.largest_usable_drop_area).max().unwrap_or(0);
+    assert_eq!(
+        solution.max_usable_drop_area, expected_max_drop,
+        "max_usable_drop_area must equal max of per-layout largest_usable_drop_area",
+    );
+    let expected_sum_sq = solution
+        .layouts
+        .iter()
+        .map(|l| l.sum_sq_usable_drop_areas)
+        .fold(0_u128, u128::saturating_add);
+    assert_eq!(
+        solution.total_sum_sq_usable_drop_areas, expected_sum_sq,
+        "total_sum_sq_usable_drop_areas must equal saturating sum of per-layout values",
+    );
 
     // Sheet inventory cap: if a sheet type has `quantity: Some(n)`, the solver
     // must never open more than n of that sheet.
@@ -821,21 +976,62 @@ fuzz_target!(|data: &[u8]| {
     let two_d_algorithm = map_two_d_algorithm(two_d.algorithm);
     let two_d_seed_value = two_d.seed;
     let guillotine_required = two_d.guillotine_required;
+    let cut_plan_preset = map_cut_plan_preset(two_d.cut_plan_preset);
     // beam_width must be >= 1 or the solver spins in a degenerate loop — match
     // the `.max(1)` clamp used inside `solve_guillotine`.
     let beam_width = usize::from(two_d.beam_width.max(1)).min(8);
     let multistart_runs = usize::from(two_d.multistart_runs.max(1)).min(6);
     let two_d_problem = build_two_d_problem(&two_d);
+    // Clamp min_usable_side to keep the threshold below the smallest sheet
+    // side (validation allows up to kerf*2 < min_side; for consolidation we
+    // just need it plausible and bounded).
+    let min_sheet_side = two_d_problem
+        .sheets
+        .iter()
+        .map(|s| s.width.min(s.height))
+        .min()
+        .unwrap_or(1);
+    let min_usable_side =
+        u32::from(two_d.min_usable_side % 16).min(min_sheet_side.saturating_sub(1));
     let two_d_options = TwoDOptions {
         algorithm: two_d_algorithm,
         seed: Some(two_d_seed_value),
         guillotine_required,
         beam_width,
         multistart_runs,
+        min_usable_side,
     };
 
     match solve_2d(two_d_problem.clone(), two_d_options) {
-        Ok(solution) => assert_two_d_invariants(&two_d_problem, &solution),
+        Ok(solution) => {
+            assert_two_d_invariants(&two_d_problem, &solution);
+
+            // Post-condition: cut plan must succeed (or fail with the only
+            // expected error) and, when Ok, must produce a finite total cost.
+            let cut_options =
+                CutPlanOptions2D { preset: cut_plan_preset, ..Default::default() };
+            match plan_cuts(&solution, &cut_options) {
+                Ok(cut_plan) => {
+                    assert!(
+                        cut_plan.total_cost.is_finite(),
+                        "cut_plan.total_cost must be finite, got {}",
+                        cut_plan.total_cost
+                    );
+                }
+                Err(CutPlanError::NonGuillotineNotCuttable { .. }) => {
+                    // Only allowed for single-blade presets; CncRouter must
+                    // always succeed.
+                    assert!(
+                        cut_plan_preset == CutPlanPreset2D::TableSaw
+                            || cut_plan_preset == CutPlanPreset2D::PanelSaw,
+                        "CncRouter should never return NonGuillotineNotCuttable"
+                    );
+                }
+                Err(other) => {
+                    panic!("unexpected cut-plan error: {other:?}");
+                }
+            }
+        }
         Err(error) => assert!(is_expected_error(&error), "unexpected 2D error: {error:?}"),
     }
 

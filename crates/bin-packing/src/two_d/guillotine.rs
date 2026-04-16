@@ -208,14 +208,10 @@ fn solve_with_strategy(
                 let mut candidate = candidate;
                 if candidate.sheet_index == child.sheets.len() {
                     let stock = &problem.sheets[candidate.stock_or_free_index];
+                    let (eff_w, eff_h) = crate::two_d::model::effective_bounds(stock);
                     child.sheets.push(SheetState {
                         stock_index: candidate.stock_or_free_index,
-                        free_rects: vec![Rect {
-                            x: 0,
-                            y: 0,
-                            width: stock.width,
-                            height: stock.height,
-                        }],
+                        free_rects: vec![Rect { x: 0, y: 0, width: eff_w, height: eff_h }],
                         placements: Vec::new(),
                     });
                     child.usage_counts[candidate.stock_or_free_index] =
@@ -227,8 +223,16 @@ fn solve_with_strategy(
                     candidate.stock_or_free_index = 0;
                 }
 
-                let delta =
-                    place_candidate(&mut child.sheets[candidate.sheet_index], &item, candidate);
+                let stock_ref = &problem.sheets[child.sheets[candidate.sheet_index].stock_index];
+                let sheet_kerf = stock_ref.kerf;
+                let edge_kerf_relief = stock_ref.edge_kerf_relief;
+                let delta = place_candidate(
+                    &mut child.sheets[candidate.sheet_index],
+                    sheet_kerf,
+                    edge_kerf_relief,
+                    &item,
+                    candidate,
+                );
                 child.total_waste_area = child.total_waste_area.saturating_sub(delta.used_area);
                 if delta.fragmentation_delta >= 0 {
                     child.fragmentation =
@@ -263,6 +267,7 @@ fn solve_with_strategy(
                     explored_states,
                     notes: vec!["beam search produced no states".to_string()],
                 },
+                options.min_usable_side,
             ));
         }
     };
@@ -284,6 +289,7 @@ fn solve_with_strategy(
             explored_states,
             notes: vec![strategy.note(split_heuristic).to_string()],
         },
+        options.min_usable_side,
     ))
 }
 
@@ -339,18 +345,19 @@ fn enumerate_candidates(
     for (stock_index, stock) in problem.sheets.iter().enumerate() {
         if stock.quantity.map(|quantity| state.usage_counts[stock_index] < quantity).unwrap_or(true)
         {
+            let (eff_w, eff_h) = crate::two_d::model::effective_bounds(stock);
             for (width, height, rotated) in item.orientations() {
-                if stock.width >= width && stock.height >= height {
-                    let waste = u64::from(stock.width) * u64::from(stock.height)
-                        - u64::from(width) * u64::from(height);
+                if eff_w >= width && eff_h >= height {
+                    let waste =
+                        u64::from(eff_w) * u64::from(eff_h) - u64::from(width) * u64::from(height);
                     let short_side_fit =
-                        stock.width.saturating_sub(width).min(stock.height.saturating_sub(height));
+                        eff_w.saturating_sub(width).min(eff_h.saturating_sub(height));
                     let long_side_fit =
-                        stock.width.saturating_sub(width).max(stock.height.saturating_sub(height));
+                        eff_w.saturating_sub(width).max(eff_h.saturating_sub(height));
                     push_split_candidates(
                         &mut candidates,
-                        stock.width,
-                        stock.height,
+                        eff_w,
+                        eff_h,
                         width,
                         height,
                         split_heuristic,
@@ -494,6 +501,8 @@ fn child_area_max(
 
 fn place_candidate(
     sheet: &mut SheetState,
+    sheet_kerf: u32,
+    edge_kerf_relief: bool,
     item: &ItemInstance2D,
     candidate: Candidate,
 ) -> PlacementDelta {
@@ -511,45 +520,57 @@ fn place_candidate(
         rotated: candidate.rotated,
     });
 
+    // Under edge kerf relief the root free rect is padded by one kerf along
+    // each trailing axis. Any split child narrower or shorter than that pad
+    // can never host another placement plus its interior kerf gap, so drop
+    // those slivers rather than carry them forward. When relief is off
+    // `min_side == 0` and the guard reduces to the standard positive-dim
+    // filter applied by `push_rect_min_side`.
+    let min_side = if edge_kerf_relief { sheet_kerf } else { 0 };
+
+    // Each internal guillotine cut consumes `sheet_kerf` units of material.
+    // The child rectangle starts `kerf` units past the placed item's trailing
+    // edge. If kerf consumes the entire remaining extent, the child is dropped.
+    // Outer sheet edges are factory edges (D3) and do not charge kerf — this is
+    // handled naturally because the sheet's free rect was created without kerf
+    // on its outer boundary, and kerf is only subtracted from the interior split.
     match candidate.split_axis {
         SplitAxis::Horizontal => {
-            push_rect(
+            // Bottom child: full-width strip below the placed item.
+            let bottom_y = free_rect.y.saturating_add(candidate.height).saturating_add(sheet_kerf);
+            let bottom_height =
+                (free_rect.y.saturating_add(free_rect.height)).saturating_sub(bottom_y);
+            push_rect_min_side(
                 &mut sheet.free_rects,
-                Rect {
-                    x: free_rect.x,
-                    y: free_rect.y + candidate.height,
-                    width: free_rect.width,
-                    height: free_rect.height.saturating_sub(candidate.height),
-                },
+                Rect { x: free_rect.x, y: bottom_y, width: free_rect.width, height: bottom_height },
+                min_side,
             );
-            push_rect(
+            // Right child: strip to the right of the placed item, same height.
+            let right_x = free_rect.x.saturating_add(candidate.width).saturating_add(sheet_kerf);
+            let right_width = (free_rect.x.saturating_add(free_rect.width)).saturating_sub(right_x);
+            push_rect_min_side(
                 &mut sheet.free_rects,
-                Rect {
-                    x: free_rect.x + candidate.width,
-                    y: free_rect.y,
-                    width: free_rect.width.saturating_sub(candidate.width),
-                    height: candidate.height,
-                },
+                Rect { x: right_x, y: free_rect.y, width: right_width, height: candidate.height },
+                min_side,
             );
         }
         SplitAxis::Vertical => {
-            push_rect(
+            // Right child: full-height strip to the right of the placed item.
+            let right_x = free_rect.x.saturating_add(candidate.width).saturating_add(sheet_kerf);
+            let right_width = (free_rect.x.saturating_add(free_rect.width)).saturating_sub(right_x);
+            push_rect_min_side(
                 &mut sheet.free_rects,
-                Rect {
-                    x: free_rect.x + candidate.width,
-                    y: free_rect.y,
-                    width: free_rect.width.saturating_sub(candidate.width),
-                    height: free_rect.height,
-                },
+                Rect { x: right_x, y: free_rect.y, width: right_width, height: free_rect.height },
+                min_side,
             );
-            push_rect(
+            // Bottom child: strip below the placed item, same width as placed item.
+            let bottom_y = free_rect.y.saturating_add(candidate.height).saturating_add(sheet_kerf);
+            let bottom_height =
+                (free_rect.y.saturating_add(free_rect.height)).saturating_sub(bottom_y);
+            push_rect_min_side(
                 &mut sheet.free_rects,
-                Rect {
-                    x: free_rect.x,
-                    y: free_rect.y + candidate.height,
-                    width: candidate.width,
-                    height: free_rect.height.saturating_sub(candidate.height),
-                },
+                Rect { x: free_rect.x, y: bottom_y, width: candidate.width, height: bottom_height },
+                min_side,
             );
         }
     }
@@ -560,8 +581,14 @@ fn place_candidate(
     }
 }
 
-fn push_rect(rects: &mut Vec<Rect>, rect: Rect) {
-    if rect.width > 0 && rect.height > 0 {
+/// Push a child free rect only when both of its sides are positive and meet
+/// or exceed `min_side`. Under edge kerf relief `min_side == sheet.kerf` so
+/// sub-kerf slivers (which can never host another placement plus its
+/// interior kerf gap) are dropped; when relief is off `min_side == 0` and
+/// this reduces to the standard zero-dim filter.
+fn push_rect_min_side(rects: &mut Vec<Rect>, rect: Rect, min_side: u32) {
+    let floor = min_side.max(1);
+    if rect.width >= floor && rect.height >= floor {
         rects.push(rect);
     }
 }
@@ -674,6 +701,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -707,6 +736,8 @@ mod tests {
                 height: 6,
                 cost: 1.0,
                 quantity: Some(1),
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "panel".to_string(),
@@ -733,6 +764,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -820,6 +853,85 @@ mod tests {
         assert_eq!(
             preferred_split_axis(fw, fh, uw, uh, SplitHeuristic::MaxAreaSplit),
             SplitAxis::Horizontal,
+        );
+    }
+
+    #[test]
+    fn guillotine_edge_relief_packs_two_pieces_on_one_sheet_with_overrun() {
+        use crate::two_d::model::{RectDemand2D, Sheet2D, TwoDOptions, TwoDProblem};
+
+        // Two 24-wide parts + 1 kerf = 49 > 48 sheet width. Without relief
+        // they must go on separate sheets. With relief the second part's
+        // trailing edge lands at 49 (one kerf past 48) on a single sheet.
+        let problem = TwoDProblem {
+            sheets: vec![Sheet2D {
+                name: "s".into(),
+                width: 48,
+                height: 10,
+                cost: 1.0,
+                quantity: None,
+                kerf: 1,
+                edge_kerf_relief: true,
+            }],
+            demands: vec![RectDemand2D {
+                name: "p".into(),
+                width: 24,
+                height: 10,
+                quantity: 2,
+                can_rotate: false,
+            }],
+        };
+
+        let solution =
+            solve_guillotine(&problem, &TwoDOptions::default()).expect("guillotine should solve");
+
+        assert_eq!(solution.sheet_count, 1, "both parts should land on one sheet");
+        let sheet = &solution.layouts[0];
+        assert_eq!(sheet.placements.len(), 2);
+
+        // Part A flush at x=0, part B at x=25 (= 24 + kerf).
+        let xs: Vec<u32> = sheet.placements.iter().map(|p| p.x).collect();
+        assert!(xs.contains(&0));
+        assert!(xs.contains(&25));
+
+        // The trailing placement extends to x + width = 49 = sheet.width + kerf.
+        let max_right =
+            sheet.placements.iter().map(|p| p.x + p.width).max().expect("placements nonempty");
+        assert_eq!(max_right, 49);
+    }
+
+    #[test]
+    fn guillotine_edge_relief_off_rejects_two_piece_overrun() {
+        use crate::two_d::model::{RectDemand2D, Sheet2D, TwoDOptions, TwoDProblem};
+
+        // Same problem with edge relief OFF — the two parts do NOT fit on
+        // one 48-wide sheet (would need 49). They either go on two sheets
+        // or one is unplaced.
+        let problem = TwoDProblem {
+            sheets: vec![Sheet2D {
+                name: "s".into(),
+                width: 48,
+                height: 10,
+                cost: 1.0,
+                quantity: None,
+                kerf: 1,
+                edge_kerf_relief: false,
+            }],
+            demands: vec![RectDemand2D {
+                name: "p".into(),
+                width: 24,
+                height: 10,
+                quantity: 2,
+                can_rotate: false,
+            }],
+        };
+
+        let solution = solve_guillotine(&problem, &TwoDOptions::default())
+            .expect("guillotine should still run");
+
+        assert!(
+            solution.sheet_count >= 2 || !solution.unplaced.is_empty(),
+            "two parts cannot share one sheet without edge relief"
         );
     }
 

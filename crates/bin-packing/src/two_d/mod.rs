@@ -3,9 +3,13 @@
 //! Provides MaxRects (several heuristics), Skyline, Guillotine beam search, and shelf-based
 //! NFDH/FFDH/BFDH algorithms plus a multistart meta-strategy.
 
+pub mod cut_plan;
+mod drops;
 mod guillotine;
+mod kerf;
 mod maxrects;
 mod model;
+mod rotation_search;
 mod shelf;
 mod skyline;
 
@@ -69,6 +73,7 @@ pub fn solve_2d(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSoluti
         TwoDAlgorithm::FirstFitDecreasingHeight => shelf::solve_ffdh(&problem, &options),
         TwoDAlgorithm::BestFitDecreasingHeight => shelf::solve_bfdh(&problem, &options),
         TwoDAlgorithm::MultiStart => maxrects::solve_multistart(&problem, &options),
+        TwoDAlgorithm::RotationSearch => rotation_search::solve_rotation_search(&problem, &options),
         TwoDAlgorithm::Auto => solve_auto(problem, options),
     }
 }
@@ -107,6 +112,7 @@ fn solve_auto(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution
         guillotine::solve_guillotine_bssf,
         guillotine::solve_guillotine_slas,
         maxrects::solve_multistart,
+        rotation_search::solve_rotation_search,
     ];
 
     let results = run_candidates_2d(&candidates, &problem, &options);
@@ -233,6 +239,8 @@ pub(crate) fn place_into_sheet(
             height: sheet_height,
             cost: 0.0,
             quantity: Some(1),
+            kerf: 0,
+            edge_kerf_relief: false,
         }],
         demands: feasible_items
             .iter()
@@ -291,6 +299,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: Some(1),
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -331,14 +341,26 @@ mod tests {
                     height: 21,
                     cost: 1.0,
                     quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
                 },
-                Sheet2D { name: "s1".to_string(), width: 9, height: 11, cost: 2.0, quantity: None },
+                Sheet2D {
+                    name: "s1".to_string(),
+                    width: 9,
+                    height: 11,
+                    cost: 2.0,
+                    quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
+                },
                 Sheet2D {
                     name: "s2".to_string(),
                     width: 23,
                     height: 15,
                     cost: 2.0,
                     quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
                 },
             ],
             demands: vec![
@@ -448,6 +470,8 @@ mod tests {
                 height: 8,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -520,6 +544,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -648,6 +674,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "A".to_string(),

@@ -17,7 +17,8 @@ native binaries, no build step, no `node-gyp`.
   local search, and an exact column-generation backend.
 - **2D rectangular packing.** MaxRects (best-area, BSSF, BLSF, bottom-left,
   contact-point), Skyline (+ min-waste), Guillotine beam search (7 variants),
-  shelf heuristics (NFDH, FFDH, BFDH), and a multistart meta-strategy.
+  shelf heuristics (NFDH, FFDH, BFDH), multistart, and rotation search
+  meta-strategies.
 - **3D box packing.** Extreme Points (6 variants), Guillotine 3D beam search
   (7 variants), layer/wall/column builders, Deepest-Bottom-Left, volume-sorted
   FFD/BFD, MultiStart, GRASP, LocalSearch, and a restricted branch-and-bound
@@ -25,7 +26,7 @@ native binaries, no build step, no `node-gyp`.
   axis permutations.
 - **Multi-stock / multi-sheet / multi-bin** with independent costs and optional
   inventory caps.
-- **Kerf and trim** modeling for 1D cuts.
+- **Kerf and trim** modeling for 1D cuts; **kerf-aware gap enforcement** for 2D sheet packing.
 - **Per-item rotation** control for 2D demands and 3D rotation masks.
 - **`Auto` mode** runs multiple strategies and returns the best candidate.
 - **Reproducible** — all randomized strategies accept a `seed`.
@@ -64,7 +65,7 @@ the `exports` map, so a single install works everywhere:
 ### Bundler (Vite / webpack / esbuild / Next.js)
 
 ```js
-import { solve1d, solve2d } from '@0xdoublesharp/bin-packing-wasm';
+import { solve1d, solve2d, plan2dCuts } from '@0xdoublesharp/bin-packing-wasm';
 
 const cutList = solve1d(
   {
@@ -78,6 +79,25 @@ const cutList = solve1d(
 );
 
 console.log(cutList.stock_count, cutList.total_waste);
+
+// Generate a cut plan from a finished 2D layout
+const layout = solve2d(
+  {
+    sheets: [{ name: 'plywood', width: 96, height: 48, kerf: 2 }],
+    demands: [
+      { name: 'panel', width: 24, height: 18, quantity: 4, can_rotate: true },
+    ],
+  },
+  { algorithm: 'auto' },
+);
+
+const cutPlan = plan2dCuts(layout, { preset: 'table_saw' });
+
+// cutPlan.total_cost — aggregate cost across all sheets
+// cutPlan.sheet_plans — per-sheet plans; each carries:
+//   .steps        — ordered cut steps (cut, rotate, fence_reset, …)
+//   .total_cost   — cost for this sheet
+//   .num_cuts, .num_rotations, .num_fence_resets, .num_tool_ups, .travel_distance
 ```
 
 Modern bundlers load the accompanying `.wasm` file automatically. Vite and
@@ -108,12 +128,12 @@ from a URL:
 
   const layout = solve2d(
     {
-      sheets: [{ name: 'plywood', width: 96, height: 48 }],
+      sheets: [{ name: 'plywood', width: 96, height: 48, kerf: 2 }],
       demands: [
         { name: 'panel', width: 24, height: 18, quantity: 4, can_rotate: true },
       ],
     },
-    { algorithm: 'auto', seed: 42 },
+    { algorithm: 'auto', seed: 42, min_usable_side: 12 },
   );
 
   console.log(layout.sheet_count, layout.total_waste_area);
@@ -152,7 +172,57 @@ setup required.
 const { solve1d } = require('@0xdoublesharp/bin-packing-wasm/nodejs');
 ```
 
+### Edge kerf relief
+
+Set `edge_kerf_relief: true` on a sheet when the final cut on each
+axis can run off the stock, consuming less than a full kerf of
+material:
+
+```js
+sheets: [
+  {
+    name: 'plywood',
+    width: 48000,
+    height: 96000,
+    kerf: 125,
+    edge_kerf_relief: true,
+  },
+];
+```
+
+Each part must still fit within the sheet's own dimensions, but the
+last placement on a row or column may extend by up to one kerf past
+the sheet boundary — the model treats this as the blade exiting the
+material.
+
 ## API
+
+### `plan2dCuts(solution, options?)`
+
+```ts
+function plan2dCuts(solution: TwoDSolution, options?: CutPlanOptions2D): CutPlanSolution2D;
+```
+
+Generates an ordered cut plan for every sheet in a finished `TwoDSolution`.
+Presets (`options.preset`): `table_saw`, `panel_saw`, `cnc_router`.
+
+The returned plan carries per-sheet steps and a `total_cost`. Each entry in
+`sheet_plans` includes an ordered `steps` array and counters for cuts,
+rotations, fence resets, tool ups, and total travel distance.
+
+Throws when `table_saw` or `panel_saw` is used on a non-guillotine layout
+(`NonGuillotineNotCuttable`) or when a cost override is invalid
+(`InvalidOptions`). Use `cnc_router` as the universal fallback for any layout.
+
+### `plan1dCuts(solution, options?)`
+
+```ts
+function plan1dCuts(solution: OneDSolution, options?: CutPlanOptions1D): CutPlanSolution1D;
+```
+
+Generates an ordered cut plan for every bar in a finished `OneDSolution`. The
+only preset is `chop_saw`. Each `bar_plans` entry carries ordered `steps`
+(`cut` and `fence_reset`) and a `total_cost`.
 
 ### `solve1d(problem, options?)`
 
@@ -192,7 +262,7 @@ Algorithms (`options.algorithm`):
   `guillotine_max_area_split`
 - Shelf heuristics: `next_fit_decreasing_height`, `first_fit_decreasing_height`,
   `best_fit_decreasing_height`
-- Multistart meta-strategy: `multi_start`
+- Meta-strategies: `multi_start`, `rotation_search`
 
 Set `options.guillotine_required = true` to restrict `auto` to
 guillotine-compatible constructions.

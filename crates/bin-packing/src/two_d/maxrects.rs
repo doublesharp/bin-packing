@@ -5,8 +5,13 @@ use rand::{RngCore, SeedableRng, rngs::SmallRng};
 use crate::Result;
 
 use super::model::{
-    ItemInstance2D, Placement2D, Rect, SolverMetrics2D, TwoDOptions, TwoDProblem, TwoDSolution,
+    ItemInstance2D, Placement2D, Rect, Sheet2D, SolverMetrics2D, TwoDOptions, TwoDProblem,
+    TwoDSolution,
 };
+
+fn min_side_for(sheet: &Sheet2D) -> u32 {
+    if sheet.edge_kerf_relief { sheet.kerf } else { 0 }
+}
 
 #[derive(Debug, Clone)]
 struct SheetState {
@@ -48,7 +53,7 @@ struct NewSheetCandidate {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum MaxRectsStrategy {
+pub(super) enum MaxRectsStrategy {
     BestAreaFit,
     BestShortSideFit,
     BestLongSideFit,
@@ -56,19 +61,17 @@ enum MaxRectsStrategy {
     ContactPoint,
 }
 
-pub(super) fn solve_maxrects(
-    problem: &TwoDProblem,
-    _options: &TwoDOptions,
-) -> Result<TwoDSolution> {
-    solve_with_strategy(problem, MaxRectsStrategy::BestAreaFit, "max_rects")
+pub(super) fn solve_maxrects(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDSolution> {
+    solve_with_strategy(problem, options, MaxRectsStrategy::BestAreaFit, "max_rects")
 }
 
 pub(super) fn solve_maxrects_bssf(
     problem: &TwoDProblem,
-    _options: &TwoDOptions,
+    options: &TwoDOptions,
 ) -> Result<TwoDSolution> {
     solve_with_strategy(
         problem,
+        options,
         MaxRectsStrategy::BestShortSideFit,
         "max_rects_best_short_side_fit",
     )
@@ -76,23 +79,28 @@ pub(super) fn solve_maxrects_bssf(
 
 pub(super) fn solve_maxrects_blsf(
     problem: &TwoDProblem,
-    _options: &TwoDOptions,
+    options: &TwoDOptions,
 ) -> Result<TwoDSolution> {
-    solve_with_strategy(problem, MaxRectsStrategy::BestLongSideFit, "max_rects_best_long_side_fit")
+    solve_with_strategy(
+        problem,
+        options,
+        MaxRectsStrategy::BestLongSideFit,
+        "max_rects_best_long_side_fit",
+    )
 }
 
 pub(super) fn solve_maxrects_bottom_left(
     problem: &TwoDProblem,
-    _options: &TwoDOptions,
+    options: &TwoDOptions,
 ) -> Result<TwoDSolution> {
-    solve_with_strategy(problem, MaxRectsStrategy::BottomLeft, "max_rects_bottom_left")
+    solve_with_strategy(problem, options, MaxRectsStrategy::BottomLeft, "max_rects_bottom_left")
 }
 
 pub(super) fn solve_maxrects_contact_point(
     problem: &TwoDProblem,
-    _options: &TwoDOptions,
+    options: &TwoDOptions,
 ) -> Result<TwoDSolution> {
-    solve_with_strategy(problem, MaxRectsStrategy::ContactPoint, "max_rects_contact_point")
+    solve_with_strategy(problem, options, MaxRectsStrategy::ContactPoint, "max_rects_contact_point")
 }
 
 pub(super) fn solve_multistart(
@@ -103,7 +111,7 @@ pub(super) fn solve_multistart(
     sort_items_descending(&mut items);
 
     let mut best =
-        pack_with_order(problem, &items, "multi_start", 1, MaxRectsStrategy::BestAreaFit)?;
+        pack_with_order(problem, options, &items, "multi_start", 1, MaxRectsStrategy::BestAreaFit)?;
     let base_seed = options.seed.unwrap_or(0x4D41_5852_4543_5453);
 
     let runs = options.multistart_runs.max(1);
@@ -112,6 +120,7 @@ pub(super) fn solve_multistart(
         let trial_items = multistart_ordered_items(&items, &mut rng);
         pack_with_order(
             problem,
+            options,
             &trial_items,
             "multi_start",
             run + 2,
@@ -134,12 +143,13 @@ pub(super) fn solve_multistart(
 
 fn solve_with_strategy(
     problem: &TwoDProblem,
+    options: &TwoDOptions,
     strategy: MaxRectsStrategy,
     algorithm: &str,
 ) -> Result<TwoDSolution> {
     let mut items = problem.expanded_items();
     sort_items_descending(&mut items);
-    pack_with_order(problem, &items, algorithm, 1, strategy)
+    pack_with_order(problem, options, &items, algorithm, 1, strategy)
 }
 
 fn multistart_ordered_items(items: &[ItemInstance2D], rng: &mut SmallRng) -> Vec<ItemInstance2D> {
@@ -165,8 +175,9 @@ fn multistart_ordered_items(items: &[ItemInstance2D], rng: &mut SmallRng) -> Vec
     keyed_items.into_iter().map(|(item, _, _)| item).collect()
 }
 
-fn pack_with_order(
+pub(super) fn pack_with_order(
     problem: &TwoDProblem,
+    options: &TwoDOptions,
     items: &[ItemInstance2D],
     algorithm: &str,
     iterations: usize,
@@ -178,20 +189,36 @@ fn pack_with_order(
 
     for item in items {
         if let Some(candidate) = choose_existing_candidate(problem, &sheets, item, strategy) {
-            place_candidate(&mut sheets[candidate.sheet_index], item, candidate);
+            let stock_index = sheets[candidate.sheet_index].stock_index;
+            let sheet_def = &problem.sheets[stock_index];
+            let (eff_w, eff_h) = crate::two_d::model::effective_bounds(sheet_def);
+            place_candidate(
+                &mut sheets[candidate.sheet_index],
+                eff_w,
+                eff_h,
+                sheet_def.kerf,
+                min_side_for(sheet_def),
+                item,
+                candidate,
+            );
             continue;
         }
 
         if let Some(candidate) = choose_new_sheet(problem, item, &usage_counts, strategy) {
             let stock = &problem.sheets[candidate.stock_index];
+            let (eff_w, eff_h) = crate::two_d::model::effective_bounds(stock);
             let mut state = SheetState {
                 stock_index: candidate.stock_index,
-                free_rects: vec![Rect { x: 0, y: 0, width: stock.width, height: stock.height }],
+                free_rects: vec![Rect { x: 0, y: 0, width: eff_w, height: eff_h }],
                 placements: Vec::new(),
             };
 
             place_candidate(
                 &mut state,
+                eff_w,
+                eff_h,
+                stock.kerf,
+                min_side_for(stock),
                 item,
                 PlacementCandidate {
                     sheet_index: 0,
@@ -232,6 +259,7 @@ fn pack_with_order(
             explored_states: 0,
             notes: vec![strategy.note().to_string()],
         },
+        options.min_usable_side,
     ))
 }
 
@@ -276,24 +304,19 @@ fn choose_new_sheet(
             sheet.quantity.map(|quantity| usage_counts[*index] < quantity).unwrap_or(true)
         })
         .flat_map(|(stock_index, sheet)| {
+            let (eff_w, eff_h) = crate::two_d::model::effective_bounds(sheet);
             item.orientations()
-                .filter(move |(width, height, _)| sheet.width >= *width && sheet.height >= *height)
+                .filter(move |(width, height, _)| eff_w >= *width && eff_h >= *height)
                 .map(move |(width, height, rotated)| NewSheetCandidate {
                     stock_index,
                     width,
                     height,
                     rotated,
                     cost: sheet.cost,
-                    area_waste: u64::from(sheet.width) * u64::from(sheet.height)
+                    area_waste: u64::from(eff_w) * u64::from(eff_h)
                         - u64::from(width) * u64::from(height),
-                    short_side_fit: sheet
-                        .width
-                        .saturating_sub(width)
-                        .min(sheet.height.saturating_sub(height)),
-                    long_side_fit: sheet
-                        .width
-                        .saturating_sub(width)
-                        .max(sheet.height.saturating_sub(height)),
+                    short_side_fit: eff_w.saturating_sub(width).min(eff_h.saturating_sub(height)),
+                    long_side_fit: eff_w.saturating_sub(width).max(eff_h.saturating_sub(height)),
                     bottom: height,
                     left: 0,
                     contact_score: width.saturating_add(height),
@@ -337,7 +360,15 @@ fn build_candidate(
     }
 }
 
-fn place_candidate(sheet: &mut SheetState, item: &ItemInstance2D, candidate: PlacementCandidate) {
+fn place_candidate(
+    sheet: &mut SheetState,
+    sheet_width: u32,
+    sheet_height: u32,
+    sheet_kerf: u32,
+    min_side: u32,
+    item: &ItemInstance2D,
+    candidate: PlacementCandidate,
+) {
     // `candidate.x`/`candidate.y` are always equal to the chosen free rect's top-left
     // corner by construction — both `build_candidate` and the new-sheet path pin
     // placements to `(free.x, free.y)`.
@@ -353,20 +384,49 @@ fn place_candidate(sheet: &mut SheetState, item: &ItemInstance2D, candidate: Pla
         rotated: candidate.rotated,
     });
 
+    // The "kerf-inflated" footprint that carves out of free space. It extends
+    // by `kerf` on all four sides of the placed rect, clipped to the sheet
+    // boundary — the factory edge is not a cut (D3). Inflating on every side
+    // (not just right and bottom) is necessary because MaxRects may place
+    // items in non-bottom-left order, so a free region can exist to the
+    // left of or above an already-placed item; that region must also be
+    // kerf-shrunken against the placement.
+    let inflated_left = placed.x.saturating_sub(sheet_kerf);
+    let inflated_top = placed.y.saturating_sub(sheet_kerf);
+    let inflated_right =
+        placed.x.saturating_add(placed.width).saturating_add(sheet_kerf).min(sheet_width);
+    let inflated_bottom =
+        placed.y.saturating_add(placed.height).saturating_add(sheet_kerf).min(sheet_height);
+    let carved = Rect {
+        x: inflated_left,
+        y: inflated_top,
+        width: inflated_right - inflated_left,
+        height: inflated_bottom - inflated_top,
+    };
+
     let old_free_rects = std::mem::take(&mut sheet.free_rects);
     for free_rect in old_free_rects {
-        if !free_rect.intersects(placed) {
+        if !free_rect.intersects(carved) {
             sheet.free_rects.push(free_rect);
             continue;
         }
 
-        split_free_rect(free_rect, placed, &mut sheet.free_rects);
+        split_free_rect(free_rect, carved, &mut sheet.free_rects, min_side);
     }
 
     prune_contained_rects(&mut sheet.free_rects);
 }
 
-fn split_free_rect(free: Rect, used: Rect, target: &mut Vec<Rect>) {
+fn push_free_rect(target: &mut Vec<Rect>, rect: Rect, min_side: u32) {
+    // Gate on `min_side` only; zero-dim rects are pruned later by
+    // `prune_contained_rects`, preserving non-relief behavior when
+    // `min_side == 0`.
+    if rect.width >= min_side && rect.height >= min_side {
+        target.push(rect);
+    }
+}
+
+fn split_free_rect(free: Rect, used: Rect, target: &mut Vec<Rect>, min_side: u32) {
     let free_right = free.x + free.width;
     let free_bottom = free.y + free.height;
     let used_right = used.x + used.width;
@@ -377,34 +437,45 @@ fn split_free_rect(free: Rect, used: Rect, target: &mut Vec<Rect>) {
     let overlap_bottom = free_bottom.min(used_bottom);
 
     if overlap_left > free.x {
-        target.push(Rect {
-            x: free.x,
-            y: free.y,
-            width: overlap_left - free.x,
-            height: free.height,
-        });
+        push_free_rect(
+            target,
+            Rect { x: free.x, y: free.y, width: overlap_left - free.x, height: free.height },
+            min_side,
+        );
     }
 
     if overlap_right < free_right {
-        target.push(Rect {
-            x: overlap_right,
-            y: free.y,
-            width: free_right - overlap_right,
-            height: free.height,
-        });
+        push_free_rect(
+            target,
+            Rect {
+                x: overlap_right,
+                y: free.y,
+                width: free_right - overlap_right,
+                height: free.height,
+            },
+            min_side,
+        );
     }
 
     if overlap_top > free.y {
-        target.push(Rect { x: free.x, y: free.y, width: free.width, height: overlap_top - free.y });
+        push_free_rect(
+            target,
+            Rect { x: free.x, y: free.y, width: free.width, height: overlap_top - free.y },
+            min_side,
+        );
     }
 
     if overlap_bottom < free_bottom {
-        target.push(Rect {
-            x: free.x,
-            y: overlap_bottom,
-            width: free.width,
-            height: free_bottom - overlap_bottom,
-        });
+        push_free_rect(
+            target,
+            Rect {
+                x: free.x,
+                y: overlap_bottom,
+                width: free.width,
+                height: free_bottom - overlap_bottom,
+            },
+            min_side,
+        );
     }
 }
 
@@ -543,7 +614,7 @@ fn compare_new_sheet_candidates(
         .then_with(|| left.stock_index.cmp(&right.stock_index))
 }
 
-fn sort_items_descending(items: &mut [ItemInstance2D]) {
+pub(super) fn sort_items_descending(items: &mut [ItemInstance2D]) {
     items.sort_by(|left, right| {
         // Widen to u64 — u32 * u32 can overflow at MAX_DIMENSION = 1 << 30.
         let left_area = u64::from(left.width) * u64::from(left.height);
@@ -618,6 +689,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -672,6 +745,8 @@ mod tests {
                 height: 6,
                 cost: 1.0,
                 quantity: Some(1),
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![RectDemand2D {
                 name: "panel".to_string(),
@@ -697,14 +772,26 @@ mod tests {
                     height: 21,
                     cost: 1.0,
                     quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
                 },
-                Sheet2D { name: "s1".to_string(), width: 9, height: 11, cost: 2.0, quantity: None },
+                Sheet2D {
+                    name: "s1".to_string(),
+                    width: 9,
+                    height: 11,
+                    cost: 2.0,
+                    quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
+                },
                 Sheet2D {
                     name: "s2".to_string(),
                     width: 23,
                     height: 15,
                     cost: 2.0,
                     quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
                 },
             ],
             demands: vec![
@@ -755,6 +842,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -791,6 +880,8 @@ mod tests {
                 height: 10,
                 cost: 1.0,
                 quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
             }],
             demands: vec![
                 RectDemand2D {
@@ -963,5 +1054,39 @@ mod tests {
         prune_contained_rects(&mut zero_dim);
         assert_eq!(zero_dim.len(), 1);
         assert_eq!(zero_dim[0].width, 10);
+    }
+
+    #[test]
+    fn maxrects_edge_relief_packs_two_pieces_on_one_sheet_with_overrun() {
+        use crate::two_d::model::{RectDemand2D, Sheet2D, TwoDOptions, TwoDProblem};
+
+        let problem = TwoDProblem {
+            sheets: vec![Sheet2D {
+                name: "s".into(),
+                width: 48,
+                height: 10,
+                cost: 1.0,
+                quantity: None,
+                kerf: 1,
+                edge_kerf_relief: true,
+            }],
+            demands: vec![RectDemand2D {
+                name: "p".into(),
+                width: 24,
+                height: 10,
+                quantity: 2,
+                can_rotate: false,
+            }],
+        };
+
+        let solution =
+            solve_maxrects(&problem, &TwoDOptions::default()).expect("maxrects should solve");
+
+        assert_eq!(solution.sheet_count, 1);
+        let sheet = &solution.layouts[0];
+        assert_eq!(sheet.placements.len(), 2);
+        let max_right =
+            sheet.placements.iter().map(|p| p.x + p.width).max().expect("placements nonempty");
+        assert_eq!(max_right, 49);
     }
 }
