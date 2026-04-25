@@ -12,6 +12,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
+  NPM_TRUSTED_PUBLISHING_VERSION: "11.5.1"
 
 jobs:
   rust:
@@ -183,8 +184,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: "22.14.0"
           registry-url: https://registry.npmjs.org
+
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@${{ env.NPM_TRUSTED_PUBLISHING_VERSION }}
 
       - name: Enable pnpm
         run: |
@@ -230,16 +234,12 @@ jobs:
       - name: Publish native npm packages
         run: |
           for dir in bindings/node/npm/*/; do
-            npm publish "$dir" --access public --provenance
+            npm publish "$dir" --access public
           done
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish Node wrapper package
-        run: npm publish --access public --provenance
+        run: npm publish --access public
         working-directory: bindings/node
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -260,7 +260,5 @@ jobs:
         working-directory: bindings/wasm
 
       - name: Publish WASM package
-        run: npm publish --access public --provenance
+        run: npm publish --access public
         working-directory: bindings/wasm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
