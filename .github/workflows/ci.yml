@@ -12,7 +12,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "22"
-  NPM_TRUSTED_PUBLISHING_VERSION: "11.5.1"
 
 jobs:
   rust:
@@ -184,11 +183,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14.0"
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Install npm with trusted publishing support
-        run: npm install --global npm@${{ env.NPM_TRUSTED_PUBLISHING_VERSION }}
+      - name: Update npm
+        run: npm install --global npm@latest
 
       - name: Enable pnpm
         run: |
@@ -234,11 +233,11 @@ jobs:
       - name: Publish native npm packages
         run: |
           for dir in bindings/node/npm/*/; do
-            npm publish "$dir" --access public
+            npm publish "$dir" --access public --provenance
           done
 
       - name: Publish Node wrapper package
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         working-directory: bindings/node
 
       - name: Create GitHub Release
@@ -260,5 +259,5 @@ jobs:
         working-directory: bindings/wasm
 
       - name: Publish WASM package
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         working-directory: bindings/wasm
