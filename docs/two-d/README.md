@@ -263,7 +263,8 @@ The `CncRouter` preset handles both guillotine and non-guillotine layouts.
 Instead of a cut tree, it emits a **tool path** — a per-placement outline
 traversal connecting placements via lift/travel/lower moves:
 
-- `CutStep2D::Cut { axis, position }` for each edge of the placement outline.
+- `CutStep2D::LineCut { from_x, from_y, to_x, to_y }` for each finite edge
+  of the placement outline.
 - `CutStep2D::ToolUp` / `CutStep2D::ToolDown` between placements.
 - `CutStep2D::Travel { to_x, to_y }` from the endpoint of one placement to
   the start of the next.

@@ -4,7 +4,7 @@ use crate::Result;
 
 use super::model::{
     ItemInstance2D, Placement2D, Sheet2D, SolverMetrics2D, TwoDOptions, TwoDProblem, TwoDSolution,
-    effective_bounds,
+    effective_bounds, projected_fresh_sheet_fit_count,
 };
 
 #[derive(Debug, Clone)]
@@ -71,14 +71,16 @@ fn solve_with_strategy(
     let mut usage_counts = vec![0_usize; problem.sheets.len()];
     let mut unplaced = Vec::new();
 
-    for item in items {
-        if let Some(candidate) = choose_existing_candidate(problem, &sheets, &item, strategy) {
+    for (item_index, item) in items.iter().enumerate() {
+        if let Some(candidate) = choose_existing_candidate(problem, &sheets, item, strategy) {
             let sheet_def = &problem.sheets[sheets[candidate.sheet_index].stock_index];
-            place_candidate(sheet_def, &mut sheets[candidate.sheet_index], &item, candidate);
+            place_candidate(sheet_def, &mut sheets[candidate.sheet_index], item, candidate);
             continue;
         }
 
-        if let Some(new_sheet) = choose_new_sheet(problem, &item, &usage_counts, strategy) {
+        if let Some(new_sheet) =
+            choose_new_sheet(problem, item, &usage_counts, strategy, &items[item_index + 1..])
+        {
             let sheet = &problem.sheets[new_sheet.stock_index];
             let (eff_w, _eff_h) = effective_bounds(sheet);
             let mut state = SheetState {
@@ -102,12 +104,12 @@ fn solve_with_strategy(
                 waste: 0,
             };
 
-            place_candidate(sheet, &mut state, &item, candidate);
+            place_candidate(sheet, &mut state, item, candidate);
             sheets.push(state);
             usage_counts[new_sheet.stock_index] =
                 usage_counts[new_sheet.stock_index].saturating_add(1);
         } else {
-            unplaced.push(item);
+            unplaced.push(item.clone());
         }
     }
 
@@ -166,6 +168,7 @@ struct NewSheetCandidate {
     width: u32,
     height: u32,
     rotated: bool,
+    projected_fit_count: usize,
     cost: f64,
 }
 
@@ -174,6 +177,7 @@ fn choose_new_sheet(
     item: &ItemInstance2D,
     usage_counts: &[usize],
     strategy: SkylineStrategy,
+    remaining_items: &[ItemInstance2D],
 ) -> Option<NewSheetCandidate> {
     problem
         .sheets
@@ -191,6 +195,12 @@ fn choose_new_sheet(
                     width,
                     height,
                     rotated,
+                    projected_fit_count: projected_fresh_sheet_fit_count(
+                        sheet,
+                        width,
+                        height,
+                        remaining_items,
+                    ),
                     cost: sheet.cost,
                 })
         })
@@ -200,8 +210,14 @@ fn choose_new_sheet(
             // Those invariants make both SkylineStrategy variants collapse to picking
             // the candidate with the smallest top, then smallest cost, then the
             // sheet's own dimensions as tie-breakers.
-            strategy
-                .compare(0, left.height, 0, 0, right.height, 0)
+            let stock_projection_ordering = if left.stock_index != right.stock_index {
+                right.projected_fit_count.cmp(&left.projected_fit_count)
+            } else {
+                Ordering::Equal
+            };
+
+            stock_projection_ordering
+                .then_with(|| strategy.compare(0, left.height, 0, 0, right.height, 0))
                 .then_with(|| left.cost.total_cmp(&right.cost))
                 .then_with(|| {
                     problem.sheets[left.stock_index]

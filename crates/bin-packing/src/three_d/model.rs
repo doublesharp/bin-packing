@@ -1,5 +1,7 @@
 //! Data model types for 3D rectangular bin packing problems and solutions.
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{BinPackingError, Result};
@@ -438,9 +440,6 @@ impl ThreeDSolution {
     /// `guillotine_required` is **not** part of the comparator — that filter
     /// is enforced by `auto.rs::solve_auto_guillotine` narrowing its
     /// candidate set, exactly the same way 2D does it.
-    // Consumed by `three_d::auto` and per-algorithm solvers (Task 6+); kept
-    // live here via the tie-break regression test in this module.
-    #[allow(dead_code)]
     pub(crate) fn is_better_than(&self, other: &Self) -> bool {
         (
             self.unplaced.len(),
@@ -456,10 +455,6 @@ impl ThreeDSolution {
     }
 }
 
-// Used by `ThreeDSolution::is_better_than` (see above) which is exercised
-// by the tie-break regression test; the struct itself is only constructed
-// inside that comparator.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct OrderedFloat3D(f64);
 impl Eq for OrderedFloat3D {}
@@ -494,9 +489,6 @@ fn default_branch_and_bound_node_limit() -> usize {
 }
 
 /// A pre-instanced item ready for placement (one entry per `quantity`).
-// Consumed by the Task 6+ EP / guillotine / layer-building solvers via
-// `ThreeDProblem::expanded_items`.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ItemInstance3D {
     pub(crate) demand_index: usize,
@@ -511,8 +503,6 @@ impl ItemInstance3D {
     /// Yields `(rotation, x_extent, y_extent, z_extent)` for every rotation
     /// allowed by `allowed_rotations`, deduplicating rotations that produce
     /// identical extents (e.g. a cube collapses all six rotations into one).
-    // Consumed by Task 6+ placement engines.
-    #[allow(dead_code)]
     pub(crate) fn orientations(&self) -> impl Iterator<Item = (Rotation3D, u32, u32, u32)> + '_ {
         let mut seen: Vec<(u32, u32, u32)> = Vec::with_capacity(6);
         self.allowed_rotations.iter().filter_map(move |rotation| {
@@ -541,7 +531,15 @@ impl ThreeDProblem {
             ));
         }
 
+        let mut bin_names = HashSet::new();
         for bin in &self.bins {
+            if !bin_names.insert(bin.name.as_str()) {
+                return Err(BinPackingError::InvalidInput(format!(
+                    "bin name `{}` must be unique",
+                    bin.name
+                )));
+            }
+
             if bin.width == 0 || bin.height == 0 || bin.depth == 0 {
                 return Err(BinPackingError::InvalidInput(format!(
                     "bin `{}` must have positive width, height, and depth",
@@ -628,8 +626,6 @@ impl ThreeDProblem {
     }
 
     /// Expand each demand into one [`ItemInstance3D`] per `quantity`.
-    // Consumed by Task 6+ placement engines.
-    #[allow(dead_code)]
     pub(crate) fn expanded_items(&self) -> Vec<ItemInstance3D> {
         let mut items = Vec::new();
         for (index, demand) in self.demands.iter().enumerate() {

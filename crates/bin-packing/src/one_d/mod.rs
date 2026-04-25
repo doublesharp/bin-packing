@@ -97,13 +97,23 @@ fn solve_auto(problem: &OneDProblem, options: &OneDOptions) -> Result<OneDSoluti
 
     let results = run_candidates_1d(heuristic_candidates, problem, options);
     let mut best: Option<OneDSolution> = None;
-    for sol in results.into_iter().flatten() {
-        if best.as_ref().is_none_or(|b| sol.is_better_than(b)) {
-            best = Some(sol);
+    let mut last_error: Option<crate::BinPackingError> = None;
+    for result in results {
+        match result {
+            Ok(sol) => {
+                if best.as_ref().is_none_or(|b| sol.is_better_than(b)) {
+                    best = Some(sol);
+                }
+            }
+            Err(e) => last_error = Some(e),
         }
     }
     let mut best = best.ok_or_else(|| {
-        crate::BinPackingError::Unsupported("auto: all heuristic candidates failed".to_string())
+        last_error.unwrap_or_else(|| {
+            crate::BinPackingError::Unsupported(
+                "auto: no heuristic candidates were run".to_string(),
+            )
+        })
     })?;
 
     // Exact solver runs after heuristics — its result takes precedence when

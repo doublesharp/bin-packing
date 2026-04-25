@@ -92,16 +92,16 @@ pub(super) fn solve_exact(problem: &OneDProblem, options: &OneDOptions) -> Resul
     let mut patterns = initial_patterns(&quantities, &weights, capacity);
     let mut seen = patterns.iter().map(|pattern| pattern.counts.clone()).collect::<HashSet<_>>();
     let mut generated_patterns = 0;
-    let mut lp_lower_bound = 0.0_f64;
+    let mut certified_lp_lower_bound = None;
 
     for _ in 0..options.column_generation_rounds {
         let Ok(dual) = solve_dual_lp(&patterns, &quantities) else {
             break;
         };
-        lp_lower_bound = dual.objective;
 
         let priced = best_pricing_pattern(&weights, &quantities, &dual.values, capacity);
         if priced.value <= 1.0 + 1e-6 {
+            certified_lp_lower_bound = Some(dual.objective);
             break;
         }
 
@@ -148,7 +148,8 @@ pub(super) fn solve_exact(problem: &OneDProblem, options: &OneDOptions) -> Resul
         &mut explored_states,
     ) else {
         heuristic.algorithm = "column_generation".to_string();
-        heuristic.lower_bound = (lp_lower_bound > 0.0).then_some(lp_lower_bound);
+        heuristic.lower_bound =
+            Some(valid_lower_bound(certified_lp_lower_bound, &demand_state, &lengths, capacity));
         heuristic.metrics.generated_patterns = generated_patterns;
         heuristic.metrics.enumerated_patterns = if enumerated_all { patterns.len() } else { 0 };
         heuristic.metrics.explored_states = explored_states;
@@ -158,7 +159,8 @@ pub(super) fn solve_exact(problem: &OneDProblem, options: &OneDOptions) -> Resul
 
     if best_count > heuristic.stock_count {
         heuristic.algorithm = "column_generation".to_string();
-        heuristic.lower_bound = (lp_lower_bound > 0.0).then_some(lp_lower_bound);
+        heuristic.lower_bound =
+            Some(valid_lower_bound(certified_lp_lower_bound, &demand_state, &lengths, capacity));
         heuristic.metrics.generated_patterns = generated_patterns;
         heuristic.metrics.enumerated_patterns = if enumerated_all { patterns.len() } else { 0 };
         heuristic.metrics.explored_states = explored_states;
@@ -188,7 +190,11 @@ pub(super) fn solve_exact(problem: &OneDProblem, options: &OneDOptions) -> Resul
         demands: &demands,
         lengths: &lengths,
         exact: enumerated_all,
-        lower_bound: if lp_lower_bound > 0.0 { lp_lower_bound } else { best_count as f64 },
+        lower_bound: if enumerated_all {
+            best_count as f64
+        } else {
+            valid_lower_bound(certified_lp_lower_bound, &demand_state, &lengths, capacity)
+        },
         generated_patterns,
         enumerated_patterns: patterns.len(),
         explored_states,
@@ -235,7 +241,7 @@ fn build_solution_from_patterns(context: &BuildContext<'_>, patterns: &[Pattern]
             enumerated_patterns: context.enumerated_patterns,
             explored_states: context.explored_states,
             notes: vec![
-                "column generation supplies the LP lower bound".to_string(),
+                "column generation uses only certified lower bounds".to_string(),
                 if context.exact {
                     "pattern dynamic programming proved optimality".to_string()
                 } else {
@@ -268,13 +274,8 @@ fn best_pricing_pattern(
     capacity: u32,
 ) -> PricingResult {
     let mut cache = HashMap::new();
-    let mut current = vec![0; quantities.len()];
-
-    let (_, counts) =
-        price_recursively(0, capacity, weights, quantities, dual_values, &mut current, &mut cache);
-
-    let value =
-        counts.iter().enumerate().map(|(index, count)| dual_values[index] * (*count as f64)).sum();
+    let (value, counts) =
+        price_recursively(0, capacity, weights, quantities, dual_values, &mut cache);
 
     PricingResult { value, pattern: Pattern { counts } }
 }
@@ -285,7 +286,6 @@ fn price_recursively(
     weights: &[u32],
     quantities: &[usize],
     dual_values: &[f64],
-    current: &mut [usize],
     cache: &mut HashMap<(usize, u32), (f64, Vec<usize>)>,
 ) -> (f64, Vec<usize>) {
     if let Some(result) = cache.get(&(index, remaining_capacity)) {
@@ -293,16 +293,15 @@ fn price_recursively(
     }
 
     if index == weights.len() {
-        return (0.0, current.to_vec());
+        return (0.0, vec![0; weights.len()]);
     }
 
     let mut best_value = f64::MIN;
-    let mut best_counts = current.to_vec();
+    let mut best_counts = vec![0; weights.len()];
     let limit =
         usize::try_from(remaining_capacity / weights[index]).unwrap_or(0).min(quantities[index]);
 
     for count in 0..=limit {
-        current[index] = count;
         let residual_capacity =
             remaining_capacity.saturating_sub(weights[index].saturating_mul(count as u32));
         let (tail_value, tail_counts) = price_recursively(
@@ -311,7 +310,6 @@ fn price_recursively(
             weights,
             quantities,
             dual_values,
-            current,
             cache,
         );
 
@@ -319,13 +317,22 @@ fn price_recursively(
         if value > best_value {
             best_value = value;
             best_counts = tail_counts;
+            best_counts[index] = count;
         }
     }
 
-    current[index] = 0;
     let result = (best_value.max(0.0), best_counts);
     cache.insert((index, remaining_capacity), result.clone());
     result
+}
+
+fn valid_lower_bound(
+    certified_lp_lower_bound: Option<f64>,
+    remaining: &[usize],
+    lengths: &[u32],
+    capacity: u32,
+) -> f64 {
+    certified_lp_lower_bound.unwrap_or_else(|| lower_bound(remaining, lengths, capacity) as f64)
 }
 
 fn enumerate_patterns(
@@ -618,8 +625,8 @@ mod tests {
     };
 
     use super::{
-        Pattern, SearchEntry, enumerate_patterns, exact_search, initial_patterns, pattern_fits,
-        solve_dual_lp, solve_exact, subtract_pattern,
+        Pattern, SearchEntry, best_pricing_pattern, enumerate_patterns, exact_search,
+        initial_patterns, pattern_fits, solve_dual_lp, solve_exact, subtract_pattern,
     };
 
     #[test]
@@ -758,6 +765,45 @@ mod tests {
         assert!(!pattern_fits(&remaining, &infeasible));
         assert!(subtract_pattern(&mut remaining, &infeasible).is_none());
         assert_eq!(format!("{}", Pattern { counts: vec![1, 2, 3] }), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn pricing_cache_is_independent_of_prefix_counts() {
+        let priced = best_pricing_pattern(&[1, 1, 1], &[1, 1, 1], &[0.1, 0.0, 0.0], 1);
+
+        assert_eq!(priced.pattern.counts, vec![1, 0, 0]);
+        assert!((priced.value - 0.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn unconverged_column_generation_uses_volume_lower_bound() {
+        let problem = OneDProblem {
+            stock: vec![Stock1D {
+                name: "stock".to_string(),
+                length: 5,
+                kerf: 0,
+                trim: 0,
+                cost: 1.0,
+                available: None,
+            }],
+            demands: vec![
+                CutDemand1D { name: "A".to_string(), length: 2, quantity: 1 },
+                CutDemand1D { name: "B".to_string(), length: 3, quantity: 1 },
+            ],
+        };
+
+        let solution = solve_exact(
+            &problem,
+            &OneDOptions {
+                column_generation_rounds: 1,
+                exact_pattern_limit: 0,
+                ..OneDOptions::default()
+            },
+        )
+        .expect("column generation solution");
+
+        assert_eq!(solution.stock_count, 1);
+        assert_eq!(solution.lower_bound, Some(1.0));
     }
 
     #[test]

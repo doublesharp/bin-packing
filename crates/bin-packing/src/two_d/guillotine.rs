@@ -4,6 +4,7 @@ use crate::Result;
 
 use super::model::{
     ItemInstance2D, Placement2D, Rect, SolverMetrics2D, TwoDOptions, TwoDProblem, TwoDSolution,
+    projected_fresh_sheet_fit_count,
 };
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,8 @@ struct Candidate {
     height: u32,
     rotated: bool,
     split_axis: SplitAxis,
+    opens_new_sheet: bool,
+    projected_fit_count: usize,
     waste: u64,
     short_side_fit: u32,
     long_side_fit: u32,
@@ -190,11 +193,18 @@ fn solve_with_strategy(
     let mut explored_states = 0_usize;
     let iterations = items.len();
 
-    for item in items {
+    for (item_index, item) in items.iter().enumerate() {
         let mut next_beam = Vec::new();
         for state in &beam {
             explored_states = explored_states.saturating_add(1);
-            let candidates = enumerate_candidates(problem, state, &item, strategy, split_heuristic);
+            let candidates = enumerate_candidates(
+                problem,
+                state,
+                item,
+                strategy,
+                split_heuristic,
+                &items[item_index + 1..],
+            );
 
             if candidates.is_empty() {
                 let mut child = state.clone();
@@ -230,7 +240,7 @@ fn solve_with_strategy(
                     &mut child.sheets[candidate.sheet_index],
                     sheet_kerf,
                     edge_kerf_relief,
-                    &item,
+                    item,
                     candidate,
                 );
                 child.total_waste_area = child.total_waste_area.saturating_sub(delta.used_area);
@@ -299,6 +309,7 @@ fn enumerate_candidates(
     item: &ItemInstance2D,
     strategy: GuillotineStrategy,
     split_heuristic: SplitHeuristic,
+    remaining_items: &[ItemInstance2D],
 ) -> Vec<Candidate> {
     let mut candidates = Vec::new();
 
@@ -332,6 +343,8 @@ fn enumerate_candidates(
                         height,
                         rotated,
                         split_axis: SplitAxis::Horizontal,
+                        opens_new_sheet: false,
+                        projected_fit_count: 0,
                         waste,
                         short_side_fit,
                         long_side_fit,
@@ -368,6 +381,13 @@ fn enumerate_candidates(
                             height,
                             rotated,
                             split_axis: SplitAxis::Horizontal,
+                            opens_new_sheet: true,
+                            projected_fit_count: projected_fresh_sheet_fit_count(
+                                stock,
+                                width,
+                                height,
+                                remaining_items,
+                            ),
                             waste,
                             short_side_fit,
                             long_side_fit,
@@ -608,15 +628,26 @@ fn compare_candidates(
     left: &Candidate,
     right: &Candidate,
 ) -> Ordering {
-    strategy
-        .compare(
-            left.waste,
-            left.short_side_fit,
-            left.long_side_fit,
-            right.waste,
-            right.short_side_fit,
-            right.long_side_fit,
-        )
+    let new_sheet_ordering = if left.opens_new_sheet
+        && right.opens_new_sheet
+        && left.stock_or_free_index != right.stock_or_free_index
+    {
+        right.projected_fit_count.cmp(&left.projected_fit_count)
+    } else {
+        Ordering::Equal
+    };
+
+    new_sheet_ordering
+        .then_with(|| {
+            strategy.compare(
+                left.waste,
+                left.short_side_fit,
+                left.long_side_fit,
+                right.waste,
+                right.short_side_fit,
+                right.long_side_fit,
+            )
+        })
         .then_with(|| left.incremental_cost.total_cmp(&right.incremental_cost))
         .then_with(|| left.width.max(left.height).cmp(&right.width.max(right.height)))
         .then_with(|| left.sheet_index.cmp(&right.sheet_index))

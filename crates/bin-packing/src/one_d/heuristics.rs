@@ -196,21 +196,28 @@ fn pack_ordered(
     let mut usage_counts = vec![0_usize; problem.stock.len()];
     let mut unplaced = Vec::new();
 
-    for piece in ordered_pieces {
-        if let Some(bin_index) = choose_existing_bin(problem, &bins, &piece, strategy) {
+    for (piece_index, piece) in ordered_pieces.iter().enumerate() {
+        if let Some(bin_index) = choose_existing_bin(problem, &bins, piece, strategy) {
             let stock_index = bins[bin_index].stock_index;
             let stock = &problem.stock[stock_index];
-            let inserted = bins[bin_index].add_piece(piece, stock);
+            let inserted = bins[bin_index].add_piece(piece.clone(), stock);
             debug_assert!(inserted, "existing feasibility check failed");
             continue;
         }
 
-        if let Some(stock_index) = choose_new_stock(problem, &piece, &usage_counts) {
+        if let Some(stock_index) = choose_new_stock(
+            problem,
+            piece,
+            &usage_counts,
+            &bins,
+            &ordered_pieces[piece_index + 1..],
+            strategy,
+        ) {
             let stock = &problem.stock[stock_index];
             let mut bin = PackedBin::new(stock_index);
             let piece_name = piece.name.clone();
             let piece_length = piece.length;
-            let inserted = bin.add_piece(piece, stock);
+            let inserted = bin.add_piece(piece.clone(), stock);
 
             // `choose_new_stock` already filtered by `stock.usable_length() >=
             // piece.length`, so a fresh empty bin must accept the piece. If it
@@ -228,7 +235,7 @@ fn pack_ordered(
             bins.push(bin);
             usage_counts[stock_index] = usage_counts[stock_index].saturating_add(1);
         } else {
-            unplaced.push(piece);
+            unplaced.push(piece.clone());
         }
     }
 
@@ -264,25 +271,161 @@ fn choose_new_stock(
     problem: &OneDProblem,
     piece: &PieceInstance,
     usage_counts: &[usize],
+    bins: &[PackedBin],
+    remaining_pieces: &[PieceInstance],
+    strategy: PlacementStrategy,
 ) -> Option<usize> {
+    let candidate_indices = feasible_new_stock_indices(problem, piece, usage_counts);
+    if candidate_indices.len() <= 1 {
+        return candidate_indices.into_iter().next();
+    }
+
+    candidate_indices
+        .into_iter()
+        .filter_map(|stock_index| {
+            project_new_stock_choice(
+                problem,
+                bins,
+                usage_counts,
+                piece,
+                stock_index,
+                remaining_pieces,
+                strategy,
+            )
+            .map(|projection| (stock_index, projection))
+        })
+        .min_by(|left, right| {
+            compare_stock_projections(&left.1, &right.1)
+                .then_with(|| compare_immediate_new_stock(problem, piece, left.0, right.0))
+        })
+        .map(|(stock_index, _)| stock_index)
+}
+
+fn choose_new_stock_greedy(
+    problem: &OneDProblem,
+    piece: &PieceInstance,
+    usage_counts: &[usize],
+) -> Option<usize> {
+    feasible_new_stock_indices(problem, piece, usage_counts)
+        .into_iter()
+        .min_by(|left, right| compare_immediate_new_stock(problem, piece, *left, *right))
+}
+
+fn feasible_new_stock_indices(
+    problem: &OneDProblem,
+    piece: &PieceInstance,
+    usage_counts: &[usize],
+) -> Vec<usize> {
     problem
         .stock
         .iter()
         .enumerate()
-        .filter(|(index, stock)| {
-            stock.usable_length() >= piece.length
-                && stock.available.map(|available| usage_counts[*index] < available).unwrap_or(true)
+        .filter_map(|(index, stock)| {
+            (stock.usable_length() >= piece.length
+                && stock.available.map(|available| usage_counts[index] < available).unwrap_or(true))
+            .then_some(index)
         })
-        .min_by(|left, right| {
-            let left_waste = left.1.usable_length().saturating_sub(piece.length);
-            let right_waste = right.1.usable_length().saturating_sub(piece.length);
+        .collect()
+}
 
-            left_waste
-                .cmp(&right_waste)
-                .then_with(|| left.1.cost.total_cmp(&right.1.cost))
-                .then_with(|| left.1.length.cmp(&right.1.length))
-        })
-        .map(|(index, _)| index)
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct StockProjection {
+    unplaced_count: usize,
+    stock_count: usize,
+    total_waste: u64,
+    total_cost: f64,
+}
+
+fn project_new_stock_choice(
+    problem: &OneDProblem,
+    bins: &[PackedBin],
+    usage_counts: &[usize],
+    piece: &PieceInstance,
+    stock_index: usize,
+    remaining_pieces: &[PieceInstance],
+    strategy: PlacementStrategy,
+) -> Option<StockProjection> {
+    let mut projected_bins = bins.to_vec();
+    let mut projected_usage = usage_counts.to_vec();
+    let stock = &problem.stock[stock_index];
+    let mut new_bin = PackedBin::new(stock_index);
+    if !new_bin.add_piece(piece.clone(), stock) {
+        return None;
+    }
+    projected_bins.push(new_bin);
+    projected_usage[stock_index] = projected_usage[stock_index].saturating_add(1);
+
+    let mut unplaced_count = 0_usize;
+    for next_piece in remaining_pieces {
+        if let Some(bin_index) = choose_existing_bin(problem, &projected_bins, next_piece, strategy)
+        {
+            let existing_stock_index = projected_bins[bin_index].stock_index;
+            let inserted = projected_bins[bin_index]
+                .add_piece(next_piece.clone(), &problem.stock[existing_stock_index]);
+            if !inserted {
+                unplaced_count = unplaced_count.saturating_add(1);
+            }
+            continue;
+        }
+
+        if let Some(next_stock_index) =
+            choose_new_stock_greedy(problem, next_piece, &projected_usage)
+        {
+            let next_stock = &problem.stock[next_stock_index];
+            let mut bin = PackedBin::new(next_stock_index);
+            if bin.add_piece(next_piece.clone(), next_stock) {
+                projected_bins.push(bin);
+                projected_usage[next_stock_index] =
+                    projected_usage[next_stock_index].saturating_add(1);
+            } else {
+                unplaced_count = unplaced_count.saturating_add(1);
+            }
+        } else {
+            unplaced_count = unplaced_count.saturating_add(1);
+        }
+    }
+
+    let total_waste = projected_bins
+        .iter()
+        .map(|bin| u64::from(bin.remaining_length(&problem.stock[bin.stock_index])))
+        .sum();
+    let total_cost = projected_bins.iter().map(|bin| problem.stock[bin.stock_index].cost).sum();
+
+    Some(StockProjection {
+        unplaced_count,
+        stock_count: projected_bins.len(),
+        total_waste,
+        total_cost,
+    })
+}
+
+fn compare_stock_projections(
+    left: &StockProjection,
+    right: &StockProjection,
+) -> std::cmp::Ordering {
+    left.unplaced_count
+        .cmp(&right.unplaced_count)
+        .then_with(|| left.stock_count.cmp(&right.stock_count))
+        .then_with(|| left.total_waste.cmp(&right.total_waste))
+        .then_with(|| left.total_cost.total_cmp(&right.total_cost))
+}
+
+fn compare_immediate_new_stock(
+    problem: &OneDProblem,
+    piece: &PieceInstance,
+    left_index: usize,
+    right_index: usize,
+) -> std::cmp::Ordering {
+    let left = &problem.stock[left_index];
+    let right = &problem.stock[right_index];
+    let left_waste = left.usable_length().saturating_sub(piece.length);
+    let right_waste = right.usable_length().saturating_sub(piece.length);
+
+    left_waste
+        .cmp(&right_waste)
+        .then_with(|| left.cost.total_cmp(&right.cost))
+        .then_with(|| left.length.cmp(&right.length))
+        .then_with(|| left_index.cmp(&right_index))
 }
 
 fn eliminate_bins(problem: &OneDProblem, bins: &mut Vec<PackedBin>, rounds: usize) {
@@ -485,7 +628,10 @@ mod tests {
             ],
             demands: vec![CutDemand1D { name: "piece".to_string(), length: 8, quantity: 1 }],
         };
-        assert_eq!(choose_new_stock(&lower_waste, &piece, &[0, 0]), Some(1));
+        assert_eq!(
+            choose_new_stock(&lower_waste, &piece, &[0, 0], &[], &[], PlacementStrategy::BestFit),
+            Some(1)
+        );
 
         let lower_cost = OneDProblem {
             stock: vec![
@@ -508,7 +654,10 @@ mod tests {
             ],
             demands: vec![CutDemand1D { name: "piece".to_string(), length: 8, quantity: 1 }],
         };
-        assert_eq!(choose_new_stock(&lower_cost, &piece, &[0, 0]), Some(1));
+        assert_eq!(
+            choose_new_stock(&lower_cost, &piece, &[0, 0], &[], &[], PlacementStrategy::BestFit),
+            Some(1)
+        );
 
         let shorter_stock = OneDProblem {
             stock: vec![
@@ -531,7 +680,10 @@ mod tests {
             ],
             demands: vec![CutDemand1D { name: "piece".to_string(), length: 8, quantity: 1 }],
         };
-        assert_eq!(choose_new_stock(&shorter_stock, &piece, &[0, 0]), Some(1));
+        assert_eq!(
+            choose_new_stock(&shorter_stock, &piece, &[0, 0], &[], &[], PlacementStrategy::BestFit),
+            Some(1)
+        );
     }
 
     #[test]

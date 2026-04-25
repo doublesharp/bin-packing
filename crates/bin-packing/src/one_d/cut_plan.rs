@@ -119,7 +119,12 @@ pub fn plan_cuts(
     let mut total_cost = 0.0_f64;
 
     for (bar_index, layout) in solution.layouts.iter().enumerate() {
-        let kerf = kerf_by_stock.get(layout.stock_name.as_str()).copied().unwrap_or(0);
+        let kerf = kerf_by_stock.get(layout.stock_name.as_str()).copied().ok_or_else(|| {
+            CutPlanError::InvalidOptions(format!(
+                "solution layout references stock `{}` which is not defined in the problem",
+                layout.stock_name
+            ))
+        })?;
         let plan = plan_bar(bar_index, layout, kerf, &effective_costs);
         total_cost += plan.total_cost;
         bar_plans.push(plan);
@@ -161,17 +166,24 @@ fn plan_bar(
     let mut last_reset: Option<u32> = None;
     let mut cursor: u64 = 0;
 
-    for cut in &layout.cuts {
+    for (index, cut) in layout.cuts.iter().enumerate() {
+        let is_last_piece = index + 1 == layout.cuts.len();
+        let needs_separating_cut = !is_last_piece || layout.remaining_length > 0;
+
         if last_reset != Some(cut.length) {
-            steps.push(CutStep1D::FenceReset { new_position: cut.length });
-            num_fence_resets += 1;
+            if needs_separating_cut {
+                steps.push(CutStep1D::FenceReset { new_position: cut.length });
+                num_fence_resets += 1;
+            }
             last_reset = Some(cut.length);
         }
         cursor = cursor.saturating_add(u64::from(cut.length));
         #[allow(clippy::cast_possible_truncation)]
         let position = cursor.min(u64::from(u32::MAX)) as u32;
-        steps.push(CutStep1D::Cut { position, piece_name: cut.name.clone() });
-        num_cuts += 1;
+        if needs_separating_cut {
+            steps.push(CutStep1D::Cut { position, piece_name: cut.name.clone() });
+            num_cuts += 1;
+        }
         // Kerf consumes material after every cut except the final one on
         // this bar (the final cut produces the last piece; nothing is cut
         // afterward). The cursor advance happens before the next cut's
@@ -291,5 +303,74 @@ mod tests {
             })
             .collect();
         assert_eq!(positions, vec![30, 62, 94]);
+    }
+
+    #[test]
+    fn exact_fill_skips_terminal_factory_edge_cut() {
+        let problem = OneDProblem {
+            stock: vec![Stock1D {
+                name: "bar".to_string(),
+                length: 100,
+                kerf: 0,
+                trim: 0,
+                cost: 1.0,
+                available: None,
+            }],
+            demands: vec![CutDemand1D { name: "half".to_string(), length: 50, quantity: 2 }],
+        };
+        let solution =
+            crate::one_d::solve_1d(problem.clone(), OneDOptions::default()).expect("solve");
+        let plan = plan_cuts(&problem, &solution, &CutPlanOptions1D::default()).expect("plan");
+
+        assert_eq!(plan.bar_plans.len(), 1);
+        let bar = &plan.bar_plans[0];
+        assert_eq!(bar.num_cuts, 1);
+        assert_eq!(bar.num_fence_resets, 1);
+
+        let positions: Vec<u32> = bar
+            .steps
+            .iter()
+            .filter_map(|step| match step {
+                CutStep1D::Cut { position, .. } => Some(*position),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(positions, vec![50]);
+    }
+
+    #[test]
+    fn solution_referencing_unknown_stock_is_rejected() {
+        // Problem defines stock "bar" but the solution layout references
+        // "ghost". Silently defaulting kerf to 0 would produce incorrect
+        // cut positions without any error.
+        let problem = empty_problem();
+        let solution = OneDSolution {
+            algorithm: "test".to_string(),
+            exact: false,
+            lower_bound: None,
+            stock_count: 1,
+            total_waste: 0,
+            total_cost: 0.0,
+            layouts: vec![crate::one_d::StockLayout1D {
+                stock_name: "ghost".to_string(),
+                stock_length: 100,
+                used_length: 10,
+                remaining_length: 90,
+                waste: 90,
+                cost: 1.0,
+                cuts: vec![crate::one_d::CutAssignment1D { name: "cut".to_string(), length: 10 }],
+            }],
+            stock_requirements: Vec::new(),
+            unplaced: Vec::new(),
+            metrics: SolverMetrics1D {
+                iterations: 0,
+                generated_patterns: 0,
+                enumerated_patterns: 0,
+                explored_states: 0,
+                notes: Vec::new(),
+            },
+        };
+        let result = plan_cuts(&problem, &solution, &CutPlanOptions1D::default());
+        assert!(matches!(result, Err(CutPlanError::InvalidOptions(msg)) if msg.contains("ghost")));
     }
 }

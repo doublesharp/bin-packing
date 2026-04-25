@@ -103,11 +103,12 @@ export interface TwoDProblem {
 }
 
 export interface TwoDOptions {
-  algorithm?: 'auto' | 'max_rects' | 'max_rects_best_short_side_fit' | 'max_rects_best_long_side_fit' | 'max_rects_bottom_left' | 'max_rects_contact_point' | 'skyline' | 'skyline_min_waste' | 'guillotine' | 'guillotine_best_short_side_fit' | 'guillotine_best_long_side_fit' | 'guillotine_shorter_leftover_axis' | 'guillotine_longer_leftover_axis' | 'guillotine_min_area_split' | 'guillotine_max_area_split' | 'next_fit_decreasing_height' | 'first_fit_decreasing_height' | 'best_fit_decreasing_height' | 'multi_start'
+  algorithm?: 'auto' | 'max_rects' | 'max_rects_best_short_side_fit' | 'max_rects_best_long_side_fit' | 'max_rects_bottom_left' | 'max_rects_contact_point' | 'skyline' | 'skyline_min_waste' | 'guillotine' | 'guillotine_best_short_side_fit' | 'guillotine_best_long_side_fit' | 'guillotine_shorter_leftover_axis' | 'guillotine_longer_leftover_axis' | 'guillotine_min_area_split' | 'guillotine_max_area_split' | 'next_fit_decreasing_height' | 'first_fit_decreasing_height' | 'best_fit_decreasing_height' | 'multi_start' | 'rotation_search'
   multistart_runs?: number
   beam_width?: number
   guillotine_required?: boolean
   min_usable_side?: number
+  auto_rotation_search_max_types?: number
   seed?: number | null
 }
 
@@ -304,6 +305,7 @@ export type CutAxis = 'vertical' | 'horizontal'
 
 export type CutStep2D =
   | { kind: 'cut'; axis: CutAxis; position: number }
+  | { kind: 'line_cut'; from_x: number; from_y: number; to_x: number; to_y: number }
   | { kind: 'rotate' }
   | { kind: 'fence_reset'; new_position: number }
   | { kind: 'tool_up' }

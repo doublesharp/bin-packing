@@ -130,7 +130,11 @@ fn solve_auto(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution
     }
     match best {
         Some(sol) => Ok(sol),
-        None => Err(last_error.expect("at least one candidate must have been run")),
+        None => Err(last_error.unwrap_or_else(|| {
+            crate::BinPackingError::Unsupported(
+                "auto: no candidate algorithms were run".to_string(),
+            )
+        })),
     }
 }
 
@@ -161,7 +165,11 @@ fn solve_auto_guillotine(problem: TwoDProblem, options: TwoDOptions) -> Result<T
     }
     match best {
         Some(sol) => Ok(sol),
-        None => Err(last_error.expect("at least one candidate must have been run")),
+        None => Err(last_error.unwrap_or_else(|| {
+            crate::BinPackingError::Unsupported(
+                "auto: no guillotine-compatible candidate succeeded".to_string(),
+            )
+        })),
     }
 }
 

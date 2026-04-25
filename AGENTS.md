@@ -36,7 +36,8 @@ Rules for contributing to this Rust bin-packing workspace. Keep the crate publis
 
 - `rustfmt` with the repo's `rustfmt.toml` (edition 2024, Unix newlines, `use_small_heuristics = "Max"`).
 - Workspace clippy lints are `deny`: `unwrap_used`, `dbg_macro`, `todo`. Treat `cargo clippy --workspace --all-targets -- -D warnings` as the gate.
-- Before claiming work is complete: `cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`.
+- `#![deny(rustdoc::broken_intra_doc_links)]` is set on the main crate. Run `cargo doc --manifest-path crates/bin-packing/Cargo.toml --no-deps --document-private-items` to surface broken doc links.
+- Before claiming work is complete: `cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo doc --manifest-path crates/bin-packing/Cargo.toml --no-deps --document-private-items`.
 - MSRV is declared in `[workspace.package]`. Don't use features newer than that without bumping it.
 
 ## Git

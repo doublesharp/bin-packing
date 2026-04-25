@@ -447,6 +447,48 @@ fn exact_solver_preserves_large_quantities_without_truncation() {
 }
 
 #[test]
+fn one_d_multi_stock_lookahead_prefers_one_larger_bar_over_two_exact_small_bars() {
+    let problem = OneDProblem {
+        stock: vec![
+            Stock1D {
+                name: "short".to_string(),
+                length: 6,
+                kerf: 0,
+                trim: 0,
+                cost: 1.0,
+                available: None,
+            },
+            Stock1D {
+                name: "long".to_string(),
+                length: 12,
+                kerf: 0,
+                trim: 0,
+                cost: 1.0,
+                available: None,
+            },
+        ],
+        demands: vec![CutDemand1D { name: "rail".to_string(), length: 6, quantity: 2 }],
+    };
+
+    for algorithm in [
+        OneDAlgorithm::FirstFitDecreasing,
+        OneDAlgorithm::BestFitDecreasing,
+        OneDAlgorithm::LocalSearch,
+        OneDAlgorithm::Auto,
+    ] {
+        let solution = solve_1d(
+            problem.clone(),
+            OneDOptions { algorithm, seed: Some(11), ..OneDOptions::default() },
+        )
+        .expect("1d solve should succeed");
+
+        assert!(solution.unplaced.is_empty());
+        assert_eq!(solution.stock_count, 1, "{algorithm:?} should use one larger bar");
+        assert_eq!(solution.layouts[0].stock_name, "long");
+    }
+}
+
+#[test]
 fn two_d_sheet_selection_uses_cost_as_tie_breaker() {
     let problem = TwoDProblem {
         sheets: vec![
@@ -512,6 +554,71 @@ fn two_d_sheet_selection_uses_cost_as_tie_breaker() {
 }
 
 #[test]
+fn two_d_multi_sheet_lookahead_prefers_one_larger_sheet_over_two_exact_small_sheets() {
+    let problem = TwoDProblem {
+        sheets: vec![
+            Sheet2D {
+                name: "small".to_string(),
+                width: 5,
+                height: 5,
+                cost: 1.0,
+                quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
+            },
+            Sheet2D {
+                name: "wide".to_string(),
+                width: 10,
+                height: 5,
+                cost: 1.0,
+                quantity: None,
+                kerf: 0,
+                edge_kerf_relief: false,
+            },
+        ],
+        demands: vec![RectDemand2D {
+            name: "tile".to_string(),
+            width: 5,
+            height: 5,
+            quantity: 2,
+            can_rotate: false,
+        }],
+    };
+
+    for algorithm in [
+        TwoDAlgorithm::MaxRects,
+        TwoDAlgorithm::MaxRectsBestShortSideFit,
+        TwoDAlgorithm::MaxRectsBestLongSideFit,
+        TwoDAlgorithm::MaxRectsBottomLeft,
+        TwoDAlgorithm::MaxRectsContactPoint,
+        TwoDAlgorithm::Skyline,
+        TwoDAlgorithm::SkylineMinWaste,
+        TwoDAlgorithm::Guillotine,
+        TwoDAlgorithm::GuillotineBestShortSideFit,
+        TwoDAlgorithm::GuillotineBestLongSideFit,
+        TwoDAlgorithm::GuillotineShorterLeftoverAxis,
+        TwoDAlgorithm::GuillotineLongerLeftoverAxis,
+        TwoDAlgorithm::GuillotineMinAreaSplit,
+        TwoDAlgorithm::GuillotineMaxAreaSplit,
+        TwoDAlgorithm::NextFitDecreasingHeight,
+        TwoDAlgorithm::FirstFitDecreasingHeight,
+        TwoDAlgorithm::BestFitDecreasingHeight,
+        TwoDAlgorithm::MultiStart,
+        TwoDAlgorithm::Auto,
+    ] {
+        let solution = solve_2d(
+            problem.clone(),
+            TwoDOptions { algorithm, seed: Some(17), ..TwoDOptions::default() },
+        )
+        .expect("2d solve should succeed");
+
+        assert!(solution.unplaced.is_empty());
+        assert_eq!(solution.sheet_count, 1, "{algorithm:?} should use one larger sheet");
+        assert_eq!(solution.layouts[0].sheet_name, "wide");
+    }
+}
+
+#[test]
 fn multistart_is_deterministic_for_a_fixed_seed() {
     let problem = sample_2d_problem();
     let options = TwoDOptions {
@@ -568,6 +675,111 @@ fn validation_rejects_non_finite_or_negative_costs() {
     )
     .expect_err("negative 2d cost should be rejected");
     assert!(matches!(two_d_error, BinPackingError::InvalidInput(_)));
+}
+
+#[test]
+fn validation_rejects_duplicate_container_names() {
+    let one_d_error = solve_1d(
+        OneDProblem {
+            stock: vec![
+                Stock1D {
+                    name: "bar".to_string(),
+                    length: 12,
+                    kerf: 0,
+                    trim: 0,
+                    cost: 1.0,
+                    available: None,
+                },
+                Stock1D {
+                    name: "bar".to_string(),
+                    length: 24,
+                    kerf: 1,
+                    trim: 0,
+                    cost: 1.0,
+                    available: None,
+                },
+            ],
+            demands: vec![CutDemand1D { name: "cut".to_string(), length: 6, quantity: 1 }],
+        },
+        OneDOptions::default(),
+    )
+    .expect_err("duplicate 1d stock names should be rejected");
+    assert!(
+        matches!(one_d_error, BinPackingError::InvalidInput(message) if message == "stock name `bar` must be unique")
+    );
+
+    let two_d_error = solve_2d(
+        TwoDProblem {
+            sheets: vec![
+                Sheet2D {
+                    name: "sheet".to_string(),
+                    width: 12,
+                    height: 12,
+                    cost: 1.0,
+                    quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
+                },
+                Sheet2D {
+                    name: "sheet".to_string(),
+                    width: 24,
+                    height: 12,
+                    cost: 1.0,
+                    quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
+                },
+            ],
+            demands: vec![RectDemand2D {
+                name: "rect".to_string(),
+                width: 6,
+                height: 6,
+                quantity: 1,
+                can_rotate: false,
+            }],
+        },
+        TwoDOptions::default(),
+    )
+    .expect_err("duplicate 2d sheet names should be rejected");
+    assert!(
+        matches!(two_d_error, BinPackingError::InvalidInput(message) if message == "sheet name `sheet` must be unique")
+    );
+
+    let three_d_error = solve_3d(
+        ThreeDProblem {
+            bins: vec![
+                Bin3D {
+                    name: "bin".to_string(),
+                    width: 10,
+                    height: 10,
+                    depth: 10,
+                    cost: 1.0,
+                    quantity: None,
+                },
+                Bin3D {
+                    name: "bin".to_string(),
+                    width: 20,
+                    height: 10,
+                    depth: 10,
+                    cost: 1.0,
+                    quantity: None,
+                },
+            ],
+            demands: vec![BoxDemand3D {
+                name: "box".to_string(),
+                width: 2,
+                height: 2,
+                depth: 2,
+                quantity: 1,
+                allowed_rotations: RotationMask3D::ALL,
+            }],
+        },
+        ThreeDOptions::default(),
+    )
+    .expect_err("duplicate 3d bin names should be rejected");
+    assert!(
+        matches!(three_d_error, BinPackingError::InvalidInput(message) if message == "bin name `bin` must be unique")
+    );
 }
 
 prop_compose! {

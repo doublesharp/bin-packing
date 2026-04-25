@@ -126,7 +126,11 @@ pub(super) fn solve_rotation_search(
                 ));
                 Ok(sol)
             }
-            None => Err(last_error.expect("at least one rotation assignment must have been tried")),
+            None => Err(last_error.unwrap_or_else(|| {
+                crate::BinPackingError::Unsupported(
+                    "rotation_search: no assignment succeeded".to_string(),
+                )
+            })),
         }
     } else {
         // Sample multistart_runs random assignments.
@@ -168,7 +172,11 @@ pub(super) fn solve_rotation_search(
                     .push(format!("sampled rotation search: {runs} of 2^{k} assignments"));
                 Ok(sol)
             }
-            None => Err(last_error.expect("at least one rotation assignment must have been tried")),
+            None => Err(last_error.unwrap_or_else(|| {
+                crate::BinPackingError::Unsupported(
+                    "rotation_search: no sampled assignment succeeded".to_string(),
+                )
+            })),
         }
     }
 }

@@ -35,7 +35,8 @@ export type TwoDAlgorithm =
   | 'next_fit_decreasing_height'
   | 'first_fit_decreasing_height'
   | 'best_fit_decreasing_height'
-  | 'multi_start';
+  | 'multi_start'
+  | 'rotation_search';
 
 /** Algorithm selector for `solve3d`. */
 export type ThreeDAlgorithm =
@@ -187,6 +188,7 @@ export interface TwoDOptions {
   beam_width?: number;
   guillotine_required?: boolean;
   min_usable_side?: number;
+  auto_rotation_search_max_types?: number;
   seed?: number | null;
 }
 
@@ -391,6 +393,7 @@ export type CutAxis = 'vertical' | 'horizontal';
 
 export type CutStep2D =
   | { kind: 'cut'; axis: CutAxis; position: number }
+  | { kind: 'line_cut'; from_x: number; from_y: number; to_x: number; to_y: number }
   | { kind: 'rotate' }
   | { kind: 'fence_reset'; new_position: number }
   | { kind: 'tool_up' }

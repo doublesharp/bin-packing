@@ -1,5 +1,7 @@
 //! Data model types for 2D rectangular bin packing problems and solutions.
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{BinPackingError, Result};
@@ -286,6 +288,84 @@ impl ItemInstance2D {
     }
 }
 
+pub(crate) fn projected_fresh_sheet_fit_count(
+    sheet: &Sheet2D,
+    first_width: u32,
+    first_height: u32,
+    remaining_items: &[ItemInstance2D],
+) -> usize {
+    let (eff_w, eff_h) = effective_bounds(sheet);
+    if first_width > eff_w || first_height > eff_h {
+        return 0;
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct ShelfProjection {
+        y: u32,
+        height: u32,
+        used_width: u32,
+    }
+
+    let mut shelves = vec![ShelfProjection { y: 0, height: first_height, used_width: first_width }];
+    let mut count = 1_usize;
+
+    for item in remaining_items {
+        let existing = shelves
+            .iter()
+            .enumerate()
+            .flat_map(|(shelf_index, shelf)| {
+                item.orientations().filter_map(move |(width, height, _)| {
+                    let gap = if shelf.used_width == 0 { 0 } else { sheet.kerf };
+                    (height <= shelf.height
+                        && shelf.used_width.saturating_add(gap).saturating_add(width) <= eff_w)
+                        .then(|| {
+                            let remaining_width = eff_w.saturating_sub(
+                                shelf.used_width.saturating_add(gap).saturating_add(width),
+                            );
+                            (shelf_index, width, remaining_width, height)
+                        })
+                })
+            })
+            .min_by(|left, right| {
+                left.2
+                    .cmp(&right.2)
+                    .then_with(|| left.3.cmp(&right.3))
+                    .then_with(|| left.0.cmp(&right.0))
+            });
+
+        if let Some((shelf_index, width, _, _)) = existing {
+            let shelf = &mut shelves[shelf_index];
+            let gap = if shelf.used_width == 0 { 0 } else { sheet.kerf };
+            shelf.used_width = shelf.used_width.saturating_add(gap).saturating_add(width);
+            count = count.saturating_add(1);
+            continue;
+        }
+
+        let base_y = shelves.last().map(|shelf| shelf.y.saturating_add(shelf.height)).unwrap_or(0);
+        let gap = if base_y == 0 { 0 } else { sheet.kerf };
+        let y = base_y.saturating_add(gap);
+        let new_shelf = item
+            .orientations()
+            .filter(|(width, height, _)| *width <= eff_w && y.saturating_add(*height) <= eff_h)
+            .map(|(width, height, _)| {
+                (width, height, eff_w.saturating_sub(width), y.saturating_add(height))
+            })
+            .min_by(|left, right| {
+                left.2
+                    .cmp(&right.2)
+                    .then_with(|| left.1.cmp(&right.1))
+                    .then_with(|| left.3.cmp(&right.3))
+            });
+
+        if let Some((width, height, _, _)) = new_shelf {
+            shelves.push(ShelfProjection { y, height, used_width: width });
+            count = count.saturating_add(1);
+        }
+    }
+
+    count
+}
+
 const MAX_DIMENSION: u32 = 1 << 30;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -310,7 +390,15 @@ impl TwoDProblem {
             ));
         }
 
+        let mut sheet_names = HashSet::new();
         for sheet in &self.sheets {
+            if !sheet_names.insert(sheet.name.as_str()) {
+                return Err(BinPackingError::InvalidInput(format!(
+                    "sheet name `{}` must be unique",
+                    sheet.name
+                )));
+            }
+
             if sheet.width == 0 || sheet.height == 0 {
                 return Err(BinPackingError::InvalidInput(format!(
                     "sheet `{}` must have positive width and height",

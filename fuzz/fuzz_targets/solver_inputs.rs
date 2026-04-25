@@ -141,9 +141,9 @@ fn map_one_d_algorithm(value: u8) -> OneDAlgorithm {
 }
 
 fn map_two_d_algorithm(value: u8) -> TwoDAlgorithm {
-    // 19 variants total in TwoDAlgorithm — every branch must be reachable so the
+    // 20 variants total in TwoDAlgorithm — every branch must be reachable so the
     // fuzzer exercises the full dispatch table.
-    match value % 19 {
+    match value % 20 {
         0 => TwoDAlgorithm::Auto,
         1 => TwoDAlgorithm::MaxRects,
         2 => TwoDAlgorithm::MaxRectsBestShortSideFit,
@@ -162,7 +162,8 @@ fn map_two_d_algorithm(value: u8) -> TwoDAlgorithm {
         15 => TwoDAlgorithm::NextFitDecreasingHeight,
         16 => TwoDAlgorithm::FirstFitDecreasingHeight,
         17 => TwoDAlgorithm::BestFitDecreasingHeight,
-        _ => TwoDAlgorithm::MultiStart,
+        18 => TwoDAlgorithm::MultiStart,
+        _ => TwoDAlgorithm::RotationSearch,
     }
 }
 
@@ -1000,11 +1001,22 @@ fuzz_target!(|data: &[u8]| {
         beam_width,
         multistart_runs,
         min_usable_side,
+        ..TwoDOptions::default()
     };
 
     match solve_2d(two_d_problem.clone(), two_d_options) {
         Ok(solution) => {
             assert_two_d_invariants(&two_d_problem, &solution);
+
+            // When `guillotine_required` is set, the returned layout must be
+            // guillotine-compatible; otherwise the caller has been given an
+            // uncuttable plan.
+            if guillotine_required {
+                assert!(
+                    solution.guillotine,
+                    "guillotine_required=true but solution.guillotine=false"
+                );
+            }
 
             // Post-condition: cut plan must succeed (or fail with the only
             // expected error) and, when Ok, must produce a finite total cost.

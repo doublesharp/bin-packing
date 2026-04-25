@@ -55,7 +55,7 @@ const cutPlan = plan2dCuts(
 
 // cutPlan.total_cost — aggregate cost for all sheets under the chosen preset
 // cutPlan.sheet_plans — array of per-sheet plans; each carries:
-//   .steps        — ordered array of cut steps (cut, rotate, fence_reset, …)
+//   .steps        — ordered array of cut steps (cut, line_cut, rotate, fence_reset, …)
 //   .total_cost   — cost for this sheet
 //   .num_cuts, .num_rotations, .num_fence_resets, .num_tool_ups, .travel_distance
 

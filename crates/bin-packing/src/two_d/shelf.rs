@@ -4,6 +4,7 @@ use crate::Result;
 
 use super::model::{
     ItemInstance2D, Placement2D, SolverMetrics2D, TwoDOptions, TwoDProblem, TwoDSolution,
+    projected_fresh_sheet_fit_count,
 };
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,7 @@ struct NewSheetCandidate {
     width: u32,
     height: u32,
     rotated: bool,
+    projected_fit_count: usize,
     waste: u64,
     cost: f64,
 }
@@ -87,31 +89,33 @@ fn solve_shelf(
     let mut unplaced = Vec::new();
     let mut explored_states = 0_usize;
 
-    for item in items {
+    for (item_index, item) in items.iter().enumerate() {
         explored_states = explored_states.saturating_add(1);
 
-        if let Some(candidate) = choose_existing_shelf(problem, &sheets, &item, strategy) {
+        if let Some(candidate) = choose_existing_shelf(problem, &sheets, item, strategy) {
             let sheet_kerf = problem.sheets[sheets[candidate.sheet_index].stock_index].kerf;
             place_on_existing_shelf(
                 &mut sheets[candidate.sheet_index],
                 sheet_kerf,
-                &item,
+                item,
                 candidate,
             );
             continue;
         }
 
-        if let Some(candidate) = choose_new_shelf(problem, &sheets, &item, strategy) {
-            place_on_new_shelf(&mut sheets[candidate.sheet_index], &item, candidate);
+        if let Some(candidate) = choose_new_shelf(problem, &sheets, item, strategy) {
+            place_on_new_shelf(&mut sheets[candidate.sheet_index], item, candidate);
             continue;
         }
 
-        if let Some(candidate) = choose_new_sheet(problem, &item, &usage_counts) {
-            open_new_sheet(&mut sheets, &item, candidate);
+        if let Some(candidate) =
+            choose_new_sheet(problem, item, &usage_counts, &items[item_index + 1..])
+        {
+            open_new_sheet(&mut sheets, item, candidate);
             usage_counts[candidate.stock_index] =
                 usage_counts[candidate.stock_index].saturating_add(1);
         } else {
-            unplaced.push(item);
+            unplaced.push(item.clone());
         }
     }
 
@@ -284,6 +288,7 @@ fn choose_new_sheet(
     problem: &TwoDProblem,
     item: &ItemInstance2D,
     usage_counts: &[usize],
+    remaining_items: &[ItemInstance2D],
 ) -> Option<NewSheetCandidate> {
     problem
         .sheets
@@ -301,6 +306,12 @@ fn choose_new_sheet(
                     width,
                     height,
                     rotated,
+                    projected_fit_count: projected_fresh_sheet_fit_count(
+                        sheet,
+                        width,
+                        height,
+                        remaining_items,
+                    ),
                     waste: u64::from(eff_w) * u64::from(eff_h)
                         - u64::from(width) * u64::from(height),
                     cost: sheet.cost,
@@ -385,8 +396,14 @@ fn compare_new_shelf_candidates(left: &NewShelfCandidate, right: &NewShelfCandid
 }
 
 fn compare_new_sheet_candidates(left: &NewSheetCandidate, right: &NewSheetCandidate) -> Ordering {
-    left.waste
-        .cmp(&right.waste)
+    let stock_projection_ordering = if left.stock_index != right.stock_index {
+        right.projected_fit_count.cmp(&left.projected_fit_count)
+    } else {
+        Ordering::Equal
+    };
+
+    stock_projection_ordering
+        .then_with(|| left.waste.cmp(&right.waste))
         .then_with(|| left.cost.total_cmp(&right.cost))
         .then_with(|| left.stock_index.cmp(&right.stock_index))
 }

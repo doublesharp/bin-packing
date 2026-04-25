@@ -10,7 +10,9 @@
 //! `bin-packing` errors are translated into JavaScript exceptions with the original
 //! error message preserved.
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 use serde::Serialize;
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 use serde::de::DeserializeOwned;
 use wasm_bindgen::prelude::*;
 
@@ -127,6 +129,7 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn from_js_value<T: DeserializeOwned>(value: JsValue, field: &str) -> Result<T, JsError> {
     if value.is_undefined() || value.is_null() {
         return Err(JsError::new(&format!("`{field}` is required")));
@@ -135,6 +138,7 @@ fn from_js_value<T: DeserializeOwned>(value: JsValue, field: &str) -> Result<T, 
         .map_err(|error| JsError::new(&format!("failed to decode `{field}`: {error}")))
 }
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn options_from_js<T: DeserializeOwned + Default>(value: JsValue) -> Result<T, JsError> {
     if value.is_undefined() || value.is_null() {
         return Ok(T::default());
@@ -143,6 +147,7 @@ fn options_from_js<T: DeserializeOwned + Default>(value: JsValue) -> Result<T, J
         .map_err(|error| JsError::new(&format!("failed to decode `options`: {error}")))
 }
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn to_js_value<T: Serialize>(value: &T) -> Result<JsValue, JsError> {
     serde_wasm_bindgen::to_value(value)
         .map_err(|error| JsError::new(&format!("failed to encode solution: {error}")))
@@ -161,6 +166,7 @@ fn options_from_json<T: DeserializeOwned + Default>(input: Option<&str>) -> Resu
     }
 }
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn to_js_error(error: impl std::fmt::Display) -> JsError {
     JsError::new(&error.to_string())
 }

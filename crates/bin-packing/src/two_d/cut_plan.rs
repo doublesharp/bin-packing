@@ -86,6 +86,17 @@ pub enum CutStep2D {
         /// Coordinate where the cut is placed.
         position: u32,
     },
+    /// Cut a finite line segment from one coordinate to another (CNC router only).
+    LineCut {
+        /// Starting x-coordinate.
+        from_x: u32,
+        /// Starting y-coordinate.
+        from_y: u32,
+        /// Destination x-coordinate.
+        to_x: u32,
+        /// Destination y-coordinate.
+        to_y: u32,
+    },
     /// Rotate the workpiece 90° (table / panel saw only).
     Rotate,
     /// Reset the fence to a new position (table / panel saw only).
@@ -446,7 +457,7 @@ fn emit_guillotine_steps(
 /// Build a per-placement outline tool-path for a CNC router.
 ///
 /// Visits placements in nearest-neighbor order from (0, 0).  For each
-/// placement emits `ToolDown`, four `Cut` steps tracing the rectangle
+/// placement emits `ToolDown`, four `LineCut` steps tracing the rectangle
 /// outline, and `ToolUp`.  A `Travel` step is emitted (with `ToolUp`
 /// before it) whenever the router must move between placements.
 fn emit_router_plan(
@@ -485,23 +496,21 @@ fn emit_router_plan(
             tool_down = true;
         }
 
-        // Trace the four edges of the rectangle as Cut steps.
-        // The tool ends back at (p.x, p.y) after the full outline.
+        // Trace the four finite edges of the rectangle. The tool ends back
+        // at (p.x, p.y) after the full outline.
+        let right = p.x.saturating_add(p.width);
+        let bottom = p.y.saturating_add(p.height);
 
-        // Top edge → right: horizontal cut, position = right edge x.
-        steps.push(CutStep2D::Cut { axis: CutAxis::Horizontal, position: p.x + p.width });
+        steps.push(CutStep2D::LineCut { from_x: p.x, from_y: p.y, to_x: right, to_y: p.y });
         num_cuts += 1;
 
-        // Right edge → bottom: vertical cut, position = bottom edge y.
-        steps.push(CutStep2D::Cut { axis: CutAxis::Vertical, position: p.y + p.height });
+        steps.push(CutStep2D::LineCut { from_x: right, from_y: p.y, to_x: right, to_y: bottom });
         num_cuts += 1;
 
-        // Bottom edge → left: horizontal cut, position = left edge x.
-        steps.push(CutStep2D::Cut { axis: CutAxis::Horizontal, position: p.x });
+        steps.push(CutStep2D::LineCut { from_x: right, from_y: bottom, to_x: p.x, to_y: bottom });
         num_cuts += 1;
 
-        // Left edge → top: vertical cut, position = top edge y.
-        steps.push(CutStep2D::Cut { axis: CutAxis::Vertical, position: p.y });
+        steps.push(CutStep2D::LineCut { from_x: p.x, from_y: bottom, to_x: p.x, to_y: p.y });
         num_cuts += 1;
 
         // Tool is now back at (p.x, p.y); record this for next iteration.
@@ -922,5 +931,211 @@ mod tests {
             plan.sheet_plans[0].num_cuts >= 1,
             "two-piece layout must produce at least one cut"
         );
+    }
+
+    #[test]
+    fn guillotine_cut_tree_never_crosses_a_placement_in_its_region() {
+        // Blade-safety invariant (per-region): at every split in the
+        // reconstructed cut tree, every placement inside that split's
+        // region lies entirely on one side of the cut. Walk the tree and
+        // verify the predicate directly; this guards against a future
+        // refactor that accidentally weakens `reconstruct_cut_tree`.
+        fn check(node: &CutTreeNode, placements: &[&Placement2D], region: (u32, u32, u32, u32)) {
+            let (rx, ry, rw, rh) = region;
+            let inside: Vec<&&Placement2D> = placements
+                .iter()
+                .filter(|p| {
+                    p.x >= rx && p.y >= ry && p.x + p.width <= rx + rw && p.y + p.height <= ry + rh
+                })
+                .collect();
+            if let CutTreeNode::Split { axis, position, first, second } = node {
+                for p in &inside {
+                    match axis {
+                        CutAxis::Vertical => assert!(
+                            p.x + p.width <= *position || p.x >= *position,
+                            "vertical cut at x={position} strictly inside placement \
+                             {name} (x={x}..{r}) in region {region:?}",
+                            name = p.name,
+                            x = p.x,
+                            r = p.x + p.width,
+                        ),
+                        CutAxis::Horizontal => assert!(
+                            p.y + p.height <= *position || p.y >= *position,
+                            "horizontal cut at y={position} strictly inside placement \
+                             {name} (y={y}..{b}) in region {region:?}",
+                            name = p.name,
+                            y = p.y,
+                            b = p.y + p.height,
+                        ),
+                    }
+                }
+                match axis {
+                    CutAxis::Vertical => {
+                        check(first, placements, (rx, ry, *position - rx, rh));
+                        check(second, placements, (*position, ry, rx + rw - *position, rh));
+                    }
+                    CutAxis::Horizontal => {
+                        check(first, placements, (rx, ry, rw, *position - ry));
+                        check(second, placements, (rx, *position, rw, ry + rh - *position));
+                    }
+                }
+            }
+        }
+
+        let problems = [
+            TwoDProblem {
+                sheets: vec![Sheet2D {
+                    name: "s".into(),
+                    width: 96,
+                    height: 48,
+                    cost: 1.0,
+                    quantity: None,
+                    kerf: 0,
+                    edge_kerf_relief: false,
+                }],
+                demands: vec![
+                    RectDemand2D {
+                        name: "a".into(),
+                        width: 24,
+                        height: 18,
+                        quantity: 4,
+                        can_rotate: true,
+                    },
+                    RectDemand2D {
+                        name: "b".into(),
+                        width: 12,
+                        height: 12,
+                        quantity: 6,
+                        can_rotate: true,
+                    },
+                ],
+            },
+            TwoDProblem {
+                sheets: vec![Sheet2D {
+                    name: "s".into(),
+                    width: 60,
+                    height: 40,
+                    cost: 1.0,
+                    quantity: None,
+                    kerf: 2,
+                    edge_kerf_relief: false,
+                }],
+                demands: vec![
+                    RectDemand2D {
+                        name: "p".into(),
+                        width: 10,
+                        height: 10,
+                        quantity: 8,
+                        can_rotate: false,
+                    },
+                    RectDemand2D {
+                        name: "q".into(),
+                        width: 15,
+                        height: 8,
+                        quantity: 4,
+                        can_rotate: true,
+                    },
+                ],
+            },
+        ];
+
+        for problem in problems {
+            let solution = solve_2d(
+                problem,
+                TwoDOptions { algorithm: TwoDAlgorithm::Guillotine, ..Default::default() },
+            )
+            .expect("solve");
+            for layout in &solution.layouts {
+                let region_w = layout
+                    .placements
+                    .iter()
+                    .map(|p| p.x + p.width)
+                    .max()
+                    .unwrap_or(0)
+                    .max(layout.width);
+                let region_h = layout
+                    .placements
+                    .iter()
+                    .map(|p| p.y + p.height)
+                    .max()
+                    .unwrap_or(0)
+                    .max(layout.height);
+                let tree = reconstruct_cut_tree(&layout.placements, 0, 0, region_w, region_h)
+                    .expect("guillotine solver should produce reconstructable tree");
+                let placements: Vec<&Placement2D> = layout.placements.iter().collect();
+                check(&tree, &placements, (0, 0, region_w, region_h));
+            }
+        }
+    }
+
+    #[test]
+    fn cnc_router_outline_line_cuts_are_contiguous() {
+        use crate::two_d::model::SheetLayout2D;
+
+        // Single placement at (10, 20) with width=5 and height=3. The CNC
+        // path must expose the four finite rectangle edges in order.
+        let layout = SheetLayout2D {
+            sheet_name: "s".into(),
+            width: 50,
+            height: 50,
+            cost: 1.0,
+            placements: vec![Placement2D {
+                name: "a".into(),
+                x: 10,
+                y: 20,
+                width: 5,
+                height: 3,
+                rotated: false,
+            }],
+            used_area: 15,
+            waste_area: 50 * 50 - 15,
+            kerf_area: 0,
+            largest_usable_drop_area: 0,
+            sum_sq_usable_drop_areas: 0,
+        };
+        let solution = TwoDSolution {
+            algorithm: "test".into(),
+            guillotine: false,
+            sheet_count: 1,
+            total_waste_area: 50 * 50 - 15,
+            total_kerf_area: 0,
+            total_cost: 1.0,
+            max_usable_drop_area: 0,
+            total_sum_sq_usable_drop_areas: 0,
+            layouts: vec![layout],
+            unplaced: Vec::new(),
+            metrics: SolverMetrics2D { iterations: 0, explored_states: 0, notes: Vec::new() },
+        };
+        let options =
+            CutPlanOptions2D { preset: CutPlanPreset2D::CncRouter, ..CutPlanOptions2D::default() };
+        let plan = plan_cuts(&solution, &options).expect("plan");
+        let sheet_plan = &plan.sheet_plans[0];
+
+        let line_cuts: Vec<&CutStep2D> = sheet_plan
+            .steps
+            .iter()
+            .filter(|step| matches!(step, CutStep2D::LineCut { .. }))
+            .collect();
+        assert_eq!(line_cuts.len(), 4, "one placement -> 4 outline cuts");
+
+        let expected = [
+            (10_u32, 20_u32, 15_u32, 20_u32),
+            (15_u32, 20_u32, 15_u32, 23_u32),
+            (15_u32, 23_u32, 10_u32, 23_u32),
+            (10_u32, 23_u32, 10_u32, 20_u32),
+        ];
+        for (i, (expected_from_x, expected_from_y, expected_to_x, expected_to_y)) in
+            expected.iter().enumerate()
+        {
+            match line_cuts[i] {
+                CutStep2D::LineCut { from_x, from_y, to_x, to_y } => {
+                    assert_eq!(
+                        (*from_x, *from_y, *to_x, *to_y),
+                        (*expected_from_x, *expected_from_y, *expected_to_x, *expected_to_y,)
+                    );
+                }
+                other => panic!("expected LineCut step at index {i}, got {other:?}"),
+            }
+        }
     }
 }

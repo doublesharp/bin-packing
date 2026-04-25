@@ -1,5 +1,7 @@
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 use napi::Error;
 use napi_derive::napi;
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 use serde::de::DeserializeOwned;
 
 #[napi]
@@ -75,6 +77,7 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn parse_json<T>(input: &str) -> napi::Result<T>
 where
     T: DeserializeOwned,
@@ -82,6 +85,7 @@ where
     serde_json::from_str(input).map_err(to_napi_error)
 }
 
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn to_napi_error(error: impl std::fmt::Display) -> Error {
     Error::from_reason(error.to_string())
 }

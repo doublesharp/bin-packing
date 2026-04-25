@@ -7,7 +7,6 @@ use super::model::{
 };
 
 /// An axis-aligned free cuboid inside a bin.
-#[allow(dead_code)] // Consumed by Task 6+ placement engines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FreeCuboid3D {
     pub(crate) x: u32,
@@ -18,7 +17,6 @@ pub(crate) struct FreeCuboid3D {
     pub(crate) depth: u32,
 }
 
-#[allow(dead_code)] // Consumed by Task 6+ placement engines.
 impl FreeCuboid3D {
     pub(crate) fn volume(self) -> u64 {
         volume_u64(self.width, self.height, self.depth)
@@ -27,54 +25,12 @@ impl FreeCuboid3D {
     pub(crate) fn fits(self, w: u32, h: u32, d: u32) -> bool {
         w <= self.width && h <= self.height && d <= self.depth
     }
-
-    pub(crate) fn intersects(self, other: Self) -> bool {
-        let self_x_end = self.x.saturating_add(self.width);
-        let self_y_end = self.y.saturating_add(self.height);
-        let self_z_end = self.z.saturating_add(self.depth);
-        let other_x_end = other.x.saturating_add(other.width);
-        let other_y_end = other.y.saturating_add(other.height);
-        let other_z_end = other.z.saturating_add(other.depth);
-
-        self.x < other_x_end
-            && self_x_end > other.x
-            && self.y < other_y_end
-            && self_y_end > other.y
-            && self.z < other_z_end
-            && self_z_end > other.z
-    }
-
-    pub(crate) fn contains(self, other: Self) -> bool {
-        let self_x_end = self.x.saturating_add(self.width);
-        let self_y_end = self.y.saturating_add(self.height);
-        let self_z_end = self.z.saturating_add(self.depth);
-        let other_x_end = other.x.saturating_add(other.width);
-        let other_y_end = other.y.saturating_add(other.height);
-        let other_z_end = other.z.saturating_add(other.depth);
-
-        self.x <= other.x
-            && self.y <= other.y
-            && self.z <= other.z
-            && self_x_end >= other_x_end
-            && self_y_end >= other_y_end
-            && self_z_end >= other_z_end
-    }
-}
-
-/// Anchor position for the EP family.
-#[allow(dead_code)] // Consumed by Task 6 EP placement engine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct ExtremePoint3D {
-    pub(crate) x: u32,
-    pub(crate) y: u32,
-    pub(crate) z: u32,
 }
 
 /// Whether two placements (in the same bin) overlap.
 ///
 /// Edge-touching (`==` boundary) is allowed; the check uses strict `<`
 /// like `crate::two_d::Rect::intersects`.
-#[allow(dead_code)] // Consumed by Task 6+ placement engines.
 pub(crate) fn placements_overlap(a: &Placement3D, b: &Placement3D) -> bool {
     let a_x_end = a.x.saturating_add(a.width);
     let a_y_end = a.y.saturating_add(a.height);
@@ -93,7 +49,6 @@ pub(crate) fn placements_overlap(a: &Placement3D, b: &Placement3D) -> bool {
 
 /// Whether a candidate placement at `(x, y, z)` with the given extents fits
 /// inside the bin and does not overlap any element of `placed`.
-#[allow(dead_code)] // Consumed by Task 6+ placement engines.
 #[allow(clippy::too_many_arguments)] // Spec API: caller passes bin extents and candidate extents explicitly.
 pub(crate) fn placement_feasible(
     x: u32,
@@ -131,7 +86,6 @@ pub(crate) fn placement_feasible(
 /// The error message has the stable shape
 /// `"3D bin count cap exceeded: opened {N} bins, MAX_BIN_COUNT_3D = {cap}"`
 /// so callers can substring-match without parsing English.
-#[allow(dead_code)] // Consumed by Task 6+ placement engines.
 pub(crate) fn check_bin_count_cap(current: usize) -> crate::Result<()> {
     if current >= MAX_BIN_COUNT_3D {
         return Err(crate::BinPackingError::Unsupported(format!(
@@ -150,7 +104,6 @@ pub(crate) fn check_bin_count_cap(current: usize) -> crate::Result<()> {
 
 /// Widening volume helper. `debug_assert!` enforces the cap; release builds
 /// trust the public validator.
-#[allow(dead_code)] // Consumed by Task 6+ placement engines.
 pub(crate) fn volume_u64(width: u32, height: u32, depth: u32) -> u64 {
     debug_assert!(width <= MAX_DIMENSION_3D, "width {width} exceeds MAX_DIMENSION_3D");
     debug_assert!(height <= MAX_DIMENSION_3D, "height {height} exceeds MAX_DIMENSION_3D");
@@ -159,28 +112,13 @@ pub(crate) fn volume_u64(width: u32, height: u32, depth: u32) -> u64 {
 }
 
 /// Widening face-area helper used by contact-point scoring.
-#[allow(dead_code)] // Consumed by Task 6 EP contact-point variant.
 pub(crate) fn surface_area_u64(a: u32, b: u32) -> u64 {
     debug_assert!(a <= MAX_DIMENSION_3D, "a {a} exceeds MAX_DIMENSION_3D");
     debug_assert!(b <= MAX_DIMENSION_3D, "b {b} exceeds MAX_DIMENSION_3D");
     u64::from(a) * u64::from(b)
 }
 
-/// Compute used and waste volume for a single layout.
-#[allow(dead_code)] // Consumed by Task 6+ solvers when assembling solutions.
-pub(crate) fn layout_volume_breakdown(layout: &BinLayout3D) -> (u64, u64) {
-    let bin_volume = volume_u64(layout.width, layout.height, layout.depth);
-    let used = layout
-        .placements
-        .iter()
-        .map(|placement| volume_u64(placement.width, placement.height, placement.depth))
-        .sum::<u64>();
-    debug_assert!(used <= bin_volume, "layout used volume exceeds bin volume");
-    (used, bin_volume.saturating_sub(used))
-}
-
 /// `(bin_index_in_problem.bins, placements)` tuple for [`build_solution`].
-#[allow(dead_code)] // Consumed by Task 6+ solvers.
 pub(crate) type BinPlacements = (usize, Vec<Placement3D>);
 
 /// Assemble a [`ThreeDSolution`] from a list of per-bin placements and a list
@@ -198,7 +136,6 @@ pub(crate) type BinPlacements = (usize, Vec<Placement3D>);
 /// Returns [`crate::BinPackingError::Unsupported`] if `bin_placements.len()`
 /// exceeds [`MAX_BIN_COUNT_3D`]. The cap is enforced here so every algorithm
 /// benefits from a single safety check.
-#[allow(dead_code)] // Consumed by Task 6+ solvers.
 pub(crate) fn build_solution(
     algorithm: impl Into<String>,
     bins: &[Bin3D],
@@ -328,38 +265,12 @@ mod tests {
     }
 
     #[test]
-    fn free_cuboid_intersects_and_contains() {
-        let a = FreeCuboid3D { x: 0, y: 0, z: 0, width: 10, height: 10, depth: 10 };
-        let b = FreeCuboid3D { x: 5, y: 5, z: 5, width: 4, height: 4, depth: 4 };
-        assert!(a.intersects(b));
-        assert!(a.contains(b));
-        assert!(!b.contains(a));
-    }
-
-    #[test]
     fn free_cuboid_volume_and_fits_helpers() {
         let cuboid = FreeCuboid3D { x: 0, y: 0, z: 0, width: 3, height: 4, depth: 5 };
         assert_eq!(cuboid.volume(), 60);
         assert!(cuboid.fits(3, 4, 5));
         assert!(cuboid.fits(1, 1, 1));
         assert!(!cuboid.fits(4, 4, 5));
-    }
-
-    #[test]
-    fn layout_volume_breakdown_reports_used_and_waste() {
-        let layout = BinLayout3D {
-            bin_name: "b".into(),
-            width: 10,
-            height: 10,
-            depth: 10,
-            cost: 1.0,
-            placements: vec![placement(0, 0, 0, 5, 5, 5), placement(5, 0, 0, 5, 5, 5)],
-            used_volume: 0,
-            waste_volume: 0,
-        };
-        let (used, waste) = layout_volume_breakdown(&layout);
-        assert_eq!(used, 250);
-        assert_eq!(waste, 750);
     }
 
     #[test]
@@ -382,13 +293,5 @@ mod tests {
             message.contains("3D bin count cap exceeded"),
             "stable error message contract: {message}"
         );
-    }
-
-    #[test]
-    fn extreme_point_3d_is_constructible() {
-        // Smoke test that exercises the anchor type so dead-code lints
-        // don't fire in release builds of the module.
-        let ep = ExtremePoint3D { x: 1, y: 2, z: 3 };
-        assert_eq!((ep.x, ep.y, ep.z), (1, 2, 3));
     }
 }

@@ -8,7 +8,7 @@
 //! 3. Walk the sorted list and drive the shared EP placement engine in
 //!    [`super::extreme_points`] via [`try_place_into_bin`], reusing the
 //!    same multi-bin bookkeeping (declaration-order open bins, best-fit
-//!    bin-type opening by volume, [`Bin3D.quantity`] caps) as the EP
+//!    bin-type opening by volume, [`Bin3D::quantity`] caps) as the EP
 //!    entry points.
 //!
 //! The only difference between the two variants is the per-item bin

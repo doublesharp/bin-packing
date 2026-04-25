@@ -1,5 +1,7 @@
 //! Data model types for 1D cutting stock problems and solutions.
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{BinPackingError, Result};
@@ -239,7 +241,15 @@ impl OneDProblem {
             ));
         }
 
+        let mut stock_names = HashSet::new();
         for stock in &self.stock {
+            if !stock_names.insert(stock.name.as_str()) {
+                return Err(BinPackingError::InvalidInput(format!(
+                    "stock name `{}` must be unique",
+                    stock.name
+                )));
+            }
+
             if stock.length == 0 {
                 return Err(BinPackingError::InvalidInput(format!(
                     "stock `{}` must have a positive length",

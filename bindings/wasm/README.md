@@ -95,7 +95,7 @@ const cutPlan = plan2dCuts(layout, { preset: 'table_saw' });
 
 // cutPlan.total_cost — aggregate cost across all sheets
 // cutPlan.sheet_plans — per-sheet plans; each carries:
-//   .steps        — ordered cut steps (cut, rotate, fence_reset, …)
+//   .steps        — ordered cut steps (cut, line_cut, rotate, fence_reset, …)
 //   .total_cost   — cost for this sheet
 //   .num_cuts, .num_rotations, .num_fence_resets, .num_tool_ups, .travel_distance
 ```

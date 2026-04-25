@@ -593,7 +593,7 @@ fn invalid_options_rejected() {
 
 /// A single placement spanning the full sheet produces an empty plan for
 /// TableSaw (the placement IS the sheet — no cut needed).
-/// For CncRouter, a single placement generates 4 Cut steps (the outline).
+/// For CncRouter, a single placement generates 4 LineCut steps (the outline).
 #[test]
 fn empty_sheet_yields_empty_plan() {
     let problem = TwoDProblem {

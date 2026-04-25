@@ -6,7 +6,7 @@ use crate::Result;
 
 use super::model::{
     ItemInstance2D, Placement2D, Rect, Sheet2D, SolverMetrics2D, TwoDOptions, TwoDProblem,
-    TwoDSolution,
+    TwoDSolution, projected_fresh_sheet_fit_count,
 };
 
 fn min_side_for(sheet: &Sheet2D) -> u32 {
@@ -43,6 +43,7 @@ struct NewSheetCandidate {
     width: u32,
     height: u32,
     rotated: bool,
+    projected_fit_count: usize,
     cost: f64,
     area_waste: u64,
     short_side_fit: u32,
@@ -187,7 +188,7 @@ pub(super) fn pack_with_order(
     let mut usage_counts = vec![0_usize; problem.sheets.len()];
     let mut unplaced = Vec::new();
 
-    for item in items {
+    for (item_index, item) in items.iter().enumerate() {
         if let Some(candidate) = choose_existing_candidate(problem, &sheets, item, strategy) {
             let stock_index = sheets[candidate.sheet_index].stock_index;
             let sheet_def = &problem.sheets[stock_index];
@@ -204,7 +205,9 @@ pub(super) fn pack_with_order(
             continue;
         }
 
-        if let Some(candidate) = choose_new_sheet(problem, item, &usage_counts, strategy) {
+        if let Some(candidate) =
+            choose_new_sheet(problem, item, &usage_counts, strategy, &items[item_index + 1..])
+        {
             let stock = &problem.sheets[candidate.stock_index];
             let (eff_w, eff_h) = crate::two_d::model::effective_bounds(stock);
             let mut state = SheetState {
@@ -295,6 +298,7 @@ fn choose_new_sheet(
     item: &ItemInstance2D,
     usage_counts: &[usize],
     strategy: MaxRectsStrategy,
+    remaining_items: &[ItemInstance2D],
 ) -> Option<NewSheetCandidate> {
     problem
         .sheets
@@ -312,6 +316,12 @@ fn choose_new_sheet(
                     width,
                     height,
                     rotated,
+                    projected_fit_count: projected_fresh_sheet_fit_count(
+                        sheet,
+                        width,
+                        height,
+                        remaining_items,
+                    ),
                     cost: sheet.cost,
                     area_waste: u64::from(eff_w) * u64::from(eff_h)
                         - u64::from(width) * u64::from(height),
@@ -608,8 +618,14 @@ fn compare_new_sheet_candidates(
     left: &NewSheetCandidate,
     right: &NewSheetCandidate,
 ) -> Ordering {
-    strategy
-        .compare(left.metrics(), right.metrics())
+    let stock_projection_ordering = if left.stock_index != right.stock_index {
+        right.projected_fit_count.cmp(&left.projected_fit_count)
+    } else {
+        Ordering::Equal
+    };
+
+    stock_projection_ordering
+        .then_with(|| strategy.compare(left.metrics(), right.metrics()))
         .then_with(|| left.cost.total_cmp(&right.cost))
         .then_with(|| left.stock_index.cmp(&right.stock_index))
 }

@@ -140,8 +140,8 @@ Any cost field on the options struct overrides the preset default. Pass
   - `total_cost`, `num_cuts`, `num_fence_resets`.
 - `CutPlanSolution2D` — contains `sheet_plans: Vec<SheetCutPlan2D>` and a
   solution-level `total_cost`. Each `SheetCutPlan2D` carries:
-  - `steps: Vec<CutStep2D>` — ordered `Cut`, `Rotate`, `FenceReset`,
-    `ToolUp`, `ToolDown`, and `Travel` steps.
+  - `steps: Vec<CutStep2D>` — ordered `Cut`, `LineCut`, `Rotate`,
+    `FenceReset`, `ToolUp`, `ToolDown`, and `Travel` steps.
   - `total_cost`, `num_cuts`, `num_rotations`, `num_fence_resets`,
     `num_tool_ups`, `travel_distance`.
 

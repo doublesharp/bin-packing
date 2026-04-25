@@ -7,8 +7,9 @@
 //! [`ThreeDSolution::is_better_than`]) is returned.
 //!
 //! Transient per-restart failures are captured in the returned solution's
-//! [`SolverMetrics3D::notes`] rather than aborting the entire sweep — the
-//! call only fails if *every* restart (including the first) errors out.
+//! [`crate::three_d::SolverMetrics3D::notes`] rather than aborting the entire
+//! sweep — the call only fails if *every* restart (including the first) errors
+//! out.
 
 use rand::{SeedableRng, prelude::SliceRandom, rngs::SmallRng};
 
