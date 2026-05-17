@@ -1483,6 +1483,81 @@ fn sample_3d_problem() -> ThreeDProblem {
     }
 }
 
+fn packrift_ecommerce_carton_fixture() -> ThreeDProblem {
+    // Compact ecommerce carton fixture derived from the public Packrift data set:
+    // https://packrift.github.io/packaging-optimization-benchmark-corpus/cartonization-solver-fixtures.html
+    ThreeDProblem {
+        bins: vec![
+            Bin3D {
+                name: "Packrift 10x6x6 carton".to_string(),
+                width: 254,
+                height: 152,
+                depth: 152,
+                cost: 0.74,
+                quantity: None,
+            },
+            Bin3D {
+                name: "Packrift 16x8x4 carton".to_string(),
+                width: 406,
+                height: 203,
+                depth: 102,
+                cost: 1.12,
+                quantity: None,
+            },
+            Bin3D {
+                name: "Packrift 20x14x6 carton".to_string(),
+                width: 508,
+                height: 356,
+                depth: 152,
+                cost: 1.41,
+                quantity: None,
+            },
+            Bin3D {
+                name: "Packrift 24x10x8 carton".to_string(),
+                width: 610,
+                height: 254,
+                depth: 203,
+                cost: 1.63,
+                quantity: Some(1),
+            },
+        ],
+        demands: vec![
+            BoxDemand3D {
+                name: "demo-small-item".to_string(),
+                width: 191,
+                height: 115,
+                depth: 89,
+                quantity: 1,
+                allowed_rotations: RotationMask3D::ALL,
+            },
+            BoxDemand3D {
+                name: "demo-flat-item".to_string(),
+                width: 381,
+                height: 178,
+                depth: 64,
+                quantity: 2,
+                allowed_rotations: RotationMask3D::ALL,
+            },
+            BoxDemand3D {
+                name: "demo-long-item".to_string(),
+                width: 534,
+                height: 216,
+                depth: 127,
+                quantity: 1,
+                allowed_rotations: RotationMask3D::ALL,
+            },
+            BoxDemand3D {
+                name: "demo-bulk-item".to_string(),
+                width: 457,
+                height: 305,
+                depth: 140,
+                quantity: 4,
+                allowed_rotations: RotationMask3D::ALL,
+            },
+        ],
+    }
+}
+
 #[test]
 fn three_d_algorithms_produce_consistent_valid_solutions() {
     let problem = sample_3d_problem();
@@ -1526,6 +1601,39 @@ fn three_d_algorithms_produce_consistent_valid_solutions() {
             Err(e) => panic!("{algorithm:?} returned unexpected error: {e:?}"),
         }
     }
+}
+
+#[test]
+fn three_d_auto_handles_packrift_ecommerce_carton_fixture() {
+    let problem = packrift_ecommerce_carton_fixture();
+    let solution = solve_3d(
+        problem.clone(),
+        ThreeDOptions {
+            algorithm: ThreeDAlgorithm::Auto,
+            seed: Some(17),
+            ..ThreeDOptions::default()
+        },
+    )
+    .expect("Packrift ecommerce carton fixture should be feasible");
+
+    assert_valid_3d_solution(&problem, &solution);
+    assert!(solution.unplaced.is_empty(), "all Packrift fixture items should be packed");
+    assert!(solution.bin_count > 1, "fixture should exercise multi-carton packing");
+    assert!(
+        solution.layouts.iter().all(|layout| layout.bin_name.starts_with("Packrift ")),
+        "fixture should use only declared Packrift carton types"
+    );
+
+    let placed_count = solution.layouts.iter().map(|layout| layout.placements.len()).sum::<usize>();
+    assert_eq!(placed_count, 8);
+
+    let used_packrift_24 = solution
+        .layouts
+        .iter()
+        .filter(|layout| layout.bin_name == "Packrift 24x10x8 carton")
+        .count();
+    assert_eq!(used_packrift_24, 1, "24x10x8 carton inventory cap should be respected");
+    assert!(solution.total_cost.is_finite(), "solution cost should remain finite");
 }
 
 #[test]
