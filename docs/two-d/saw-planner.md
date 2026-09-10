@@ -64,7 +64,7 @@ Render cut bands and segments directly. Do not run the legacy phantom-gap filter
 
 `sheet_views[].operation_ids` reference the authoritative schedule for diagrams. They are not standalone execution plans. In particular, interleaved sheets must be executed in job order to obtain the reported setup savings. Batching changes scheduling, not placement orientation or physical pass concurrency.
 
-This API adds new Rust types and functions without adding fields or variants to the existing packing or cutting structs/enums. Existing Rust literals and legacy JSON shapes remain intact. New JavaScript exports exist in native Node, combined WASM and the two-d WASM entry point. A release should be an additive feature release, preferably 0.4.0 while the crate is pre-1.0. No version bump or publication is performed by this implementation. Future changes to required new Rust fields or exhaustive enums must account for source compatibility even if JSON gains defaults; incompatible output changes need another schema version.
+This API adds new Rust types and functions without adding fields or variants to the existing packing or cutting structs/enums. Existing Rust literals and legacy JSON shapes remain intact. New JavaScript exports exist in native Node, combined WASM and the two-d WASM entry point. This API is introduced in the additive 0.4.0 release. Future changes to required new Rust fields or exhaustive enums must account for source compatibility even if JSON gains defaults; incompatible output changes need another schema version.
 
 Runnable examples:
 
