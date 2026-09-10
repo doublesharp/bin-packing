@@ -1,7 +1,8 @@
 //! Extreme Points placement engine with six scoring variants.
 //!
 //! Implements Crainic, Perboli, and Tadei (2008) "Extreme Point-Based
-//! Heuristics for Three-Dimensional Bin Packing" (INFORMS J. Comput. 20(3))
+//! Heuristics for Three-Dimensional Bin Packing" (INFORMS Journal on
+//! Computing 20(3))
 //! generalised to a multi-bin loop. A single shared engine processes the
 //! expanded item list, parameterised by an [`ExtremePointsScoring`] enum
 //! that selects which of the six candidate rankings to use.
@@ -85,12 +86,17 @@ pub(super) fn try_place_into_bin(
     item: &ItemInstance3D,
     scoring: ExtremePointsScoring,
 ) -> Option<Placement3D> {
-    let placed_volume: u64 = state
-        .placements
-        .iter()
-        .map(|placement| volume_u64(placement.width, placement.height, placement.depth))
-        .sum();
-    let bin_volume = volume_u64(bin.width, bin.height, bin.depth);
+    let (placed_volume, bin_volume) = if matches!(scoring, ExtremePointsScoring::VolumeFitResidual)
+    {
+        let placed_volume = state
+            .placements
+            .iter()
+            .map(|placement| volume_u64(placement.width, placement.height, placement.depth))
+            .sum();
+        (placed_volume, volume_u64(bin.width, bin.height, bin.depth))
+    } else {
+        (0, 0)
+    };
 
     // Snapshot the eps set into a Vec so we can iterate while we defer the
     // mutation to after selection.
@@ -572,9 +578,8 @@ fn score_candidate(
 /// overlap areas, summed across all six faces of the candidate box.
 ///
 /// The neighbour contribution deliberately uses the union of overlap
-/// rectangles (via coordinate compression) rather than a per-neighbour
-/// sum, so that a single face touching several neighbours does not
-/// double-count the shared regions.
+/// rectangles rather than a per-neighbour sum, so that a single face
+/// touching several neighbours does not double-count the shared regions.
 #[allow(clippy::too_many_arguments)]
 fn contact_point_score(
     bin: &Bin3D,
@@ -632,6 +637,10 @@ fn contact_point_score(
     // Face at z = z_hi: neighbours with `other.z == z_hi`.
     let mut rects_z_hi: Vec<(u32, u32, u32, u32)> = Vec::new();
 
+    let yz_cand = ((y_lo, y_hi), (z_lo, z_hi));
+    let xz_cand = ((x_lo, x_hi), (z_lo, z_hi));
+    let xy_cand = ((x_lo, x_hi), (y_lo, y_hi));
+
     for placement in placements {
         let p_x_lo = placement.x;
         let p_x_hi = placement.x + placement.width;
@@ -640,9 +649,6 @@ fn contact_point_score(
         let p_z_lo = placement.z;
         let p_z_hi = placement.z + placement.depth;
 
-        let yz_cand = ((y_lo, y_hi), (z_lo, z_hi));
-        let xz_cand = ((x_lo, x_hi), (z_lo, z_hi));
-        let xy_cand = ((x_lo, x_hi), (y_lo, y_hi));
         let yz_other = ((p_y_lo, p_y_hi), (p_z_lo, p_z_hi));
         let xz_other = ((p_x_lo, p_x_hi), (p_z_lo, p_z_hi));
         let xy_other = ((p_x_lo, p_x_hi), (p_y_lo, p_y_hi));
@@ -706,43 +712,96 @@ fn intersect_2d(
 }
 
 /// Compute the union area of a set of axis-aligned rectangles, each
-/// specified as `(a_lo, a_hi, b_lo, b_hi)` on a 2D face plane. Uses
-/// coordinate compression — `O(n^2)` for `n` input rectangles.
+/// specified as `(a_lo, a_hi, b_lo, b_hi)` on a 2D face plane.
+///
+/// Uses an event sweep over the first axis and recomputes merged active
+/// spans on the second axis between events. Complexity is `O(n² log n)`
+/// for `n` input rectangles; the contact sets are small, and this avoids
+/// the previous coordinate-grid scan with an inner coverage search.
 fn union_area(rects: &[(u32, u32, u32, u32)]) -> u64 {
     if rects.is_empty() {
         return 0;
     }
-    let mut xs: Vec<u32> = Vec::with_capacity(rects.len() * 2);
-    let mut ys: Vec<u32> = Vec::with_capacity(rects.len() * 2);
-    for &(lo_a, hi_a, lo_b, hi_b) in rects {
-        xs.push(lo_a);
-        xs.push(hi_a);
-        ys.push(lo_b);
-        ys.push(hi_b);
+    if let [(lo_a, hi_a, lo_b, hi_b)] = rects {
+        return u64::from((*hi_a).saturating_sub(*lo_a))
+            .saturating_mul(u64::from((*hi_b).saturating_sub(*lo_b)));
     }
-    xs.sort_unstable();
-    xs.dedup();
-    ys.sort_unstable();
-    ys.dedup();
 
-    let mut area: u64 = 0;
-    for xi in 0..xs.len().saturating_sub(1) {
-        let x0 = xs[xi];
-        let x1 = xs[xi + 1];
-        let dx = u64::from(x1 - x0);
-        for yi in 0..ys.len().saturating_sub(1) {
-            let y0 = ys[yi];
-            let y1 = ys[yi + 1];
-            let covered = rects.iter().any(|&(lo_a, hi_a, lo_b, hi_b)| {
-                lo_a <= x0 && x1 <= hi_a && lo_b <= y0 && y1 <= hi_b
-            });
-            if covered {
-                let dy = u64::from(y1 - y0);
-                area = area.saturating_add(dx.saturating_mul(dy));
-            }
+    let mut events: Vec<UnionEvent> = Vec::with_capacity(rects.len() * 2);
+    for &(lo_a, hi_a, lo_b, hi_b) in rects {
+        if lo_a >= hi_a || lo_b >= hi_b {
+            continue;
         }
+        events.push(UnionEvent { x: lo_a, lo: lo_b, hi: hi_b, opening: true });
+        events.push(UnionEvent { x: hi_a, lo: lo_b, hi: hi_b, opening: false });
     }
+    if events.is_empty() {
+        return 0;
+    }
+
+    events.sort_unstable_by(|left, right| left.x.cmp(&right.x));
+
+    let mut active: Vec<(u32, u32)> = Vec::with_capacity(rects.len());
+    let mut scratch: Vec<(u32, u32)> = Vec::with_capacity(rects.len());
+    let mut area = 0_u64;
+    let mut prev_x = events[0].x;
+    let mut index = 0;
+
+    while index < events.len() {
+        let x = events[index].x;
+        let dx = x.saturating_sub(prev_x);
+        if dx > 0 {
+            let covered = merged_interval_len(&active, &mut scratch);
+            area = area.saturating_add(u64::from(dx).saturating_mul(covered));
+        }
+
+        while index < events.len() && events[index].x == x {
+            let event = events[index];
+            if event.opening {
+                active.push((event.lo, event.hi));
+            } else if let Some(active_index) =
+                active.iter().position(|interval| *interval == (event.lo, event.hi))
+            {
+                active.swap_remove(active_index);
+            }
+            index += 1;
+        }
+        prev_x = x;
+    }
+
     area
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UnionEvent {
+    x: u32,
+    lo: u32,
+    hi: u32,
+    opening: bool,
+}
+
+fn merged_interval_len(active: &[(u32, u32)], scratch: &mut Vec<(u32, u32)>) -> u64 {
+    scratch.clear();
+    scratch.extend_from_slice(active);
+    scratch.sort_unstable();
+
+    let mut total = 0_u64;
+    let mut current: Option<(u32, u32)> = None;
+    for &(lo, hi) in scratch.iter() {
+        current = match current {
+            None => Some((lo, hi)),
+            Some((cur_lo, cur_hi)) if lo <= cur_hi => Some((cur_lo, cur_hi.max(hi))),
+            Some((cur_lo, cur_hi)) => {
+                total = total.saturating_add(u64::from(cur_hi - cur_lo));
+                Some((lo, hi))
+            }
+        };
+    }
+    if let Some((lo, hi)) = current {
+        total = total.saturating_add(u64::from(hi - lo));
+    }
+
+    total
 }
 
 /// Project the three raw new corners generated by placing `placement` and
@@ -899,6 +958,18 @@ mod tests {
                 allowed_rotations: RotationMask3D::ALL,
             }],
         }
+    }
+
+    #[test]
+    fn union_area_counts_overlapping_rectangles_once() {
+        let rects = vec![(0, 4, 0, 4), (2, 6, 1, 3)];
+        assert_eq!(union_area(&rects), 20);
+    }
+
+    #[test]
+    fn union_area_sums_disjoint_and_touching_rectangles() {
+        let rects = vec![(0, 2, 0, 2), (2, 4, 0, 2), (10, 12, 10, 12)];
+        assert_eq!(union_area(&rects), 12);
     }
 
     #[test]

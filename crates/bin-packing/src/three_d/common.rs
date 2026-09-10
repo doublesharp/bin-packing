@@ -3,7 +3,7 @@
 
 use super::model::{
     Bin3D, BinLayout3D, BoxDemand3D, ItemInstance3D, MAX_BIN_COUNT_3D, MAX_DIMENSION_3D,
-    Placement3D, Rotation3D, SolverMetrics3D, ThreeDSolution,
+    Placement3D, SolverMetrics3D, ThreeDSolution,
 };
 
 /// An axis-aligned free cuboid inside a bin.
@@ -65,17 +65,31 @@ pub(crate) fn placement_feasible(
     if x.saturating_add(w) > bin_w || y.saturating_add(h) > bin_h || z.saturating_add(d) > bin_d {
         return false;
     }
-    let candidate = Placement3D {
-        name: String::new(),
-        x,
-        y,
-        z,
-        width: w,
-        height: h,
-        depth: d,
-        rotation: Rotation3D::Xyz,
-    };
-    placed.iter().all(|other| !placements_overlap(&candidate, other))
+    placed.iter().all(|other| !candidate_overlaps_placement(x, y, z, w, h, d, other))
+}
+
+fn candidate_overlaps_placement(
+    x: u32,
+    y: u32,
+    z: u32,
+    width: u32,
+    height: u32,
+    depth: u32,
+    other: &Placement3D,
+) -> bool {
+    let x_end = x.saturating_add(width);
+    let y_end = y.saturating_add(height);
+    let z_end = z.saturating_add(depth);
+    let other_x_end = other.x.saturating_add(other.width);
+    let other_y_end = other.y.saturating_add(other.height);
+    let other_z_end = other.z.saturating_add(other.depth);
+
+    x < other_x_end
+        && x_end > other.x
+        && y < other_y_end
+        && y_end > other.y
+        && z < other_z_end
+        && z_end > other.z
 }
 
 /// Returns `Err(BinPackingError::Unsupported(...))` if `current` is at or
