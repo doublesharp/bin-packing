@@ -41,9 +41,11 @@ pub(crate) fn usable_drop_metrics(
     placements: &[Placement2D],
     min_usable_side: u32,
 ) -> (u64, u128) {
-    let largest = largest_usable_free_rectangle_area(sheet, placements, min_usable_side);
+    let clipped = clipped_placements(sheet, placements);
+    let ys = y_boundaries(sheet, &clipped);
+    let largest = largest_usable_free_rectangle_area(sheet, &clipped, &ys, min_usable_side);
 
-    let partition = disjoint_partition(sheet, placements);
+    let partition = disjoint_partition(sheet, &clipped, &ys);
     let sum_sq = partition
         .iter()
         .filter(|r| r.width >= min_usable_side && r.height >= min_usable_side)
@@ -56,6 +58,40 @@ pub(crate) fn usable_drop_metrics(
     (largest, sum_sq)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ClippedPlacement {
+    x_lo: u32,
+    x_hi: u32,
+    y_lo: u32,
+    y_hi: u32,
+}
+
+fn clipped_placements(sheet: &Sheet2D, placements: &[Placement2D]) -> Vec<ClippedPlacement> {
+    placements
+        .iter()
+        .filter_map(|placement| {
+            let x_lo = placement.x.min(sheet.width);
+            let x_hi = placement.x.saturating_add(placement.width).min(sheet.width);
+            let y_lo = placement.y.min(sheet.height);
+            let y_hi = placement.y.saturating_add(placement.height).min(sheet.height);
+            (x_lo < x_hi && y_lo < y_hi).then_some(ClippedPlacement { x_lo, x_hi, y_lo, y_hi })
+        })
+        .collect()
+}
+
+fn y_boundaries(sheet: &Sheet2D, placements: &[ClippedPlacement]) -> Vec<u32> {
+    let mut ys: Vec<u32> = Vec::with_capacity(placements.len() * 2 + 2);
+    ys.push(0);
+    ys.push(sheet.height);
+    for placement in placements {
+        ys.push(placement.y_lo);
+        ys.push(placement.y_hi);
+    }
+    ys.sort_unstable();
+    ys.dedup();
+    ys
+}
+
 /// Canonical horizontal-strip decomposition of the free region.
 ///
 /// y-band boundaries are derived from `0`, `sheet.height`, and each
@@ -64,20 +100,7 @@ pub(crate) fn usable_drop_metrics(
 /// are subtracted to yield disjoint free rectangles. The result is a
 /// partition: every point in the free region belongs to exactly one
 /// returned rectangle.
-fn disjoint_partition(sheet: &Sheet2D, placements: &[Placement2D]) -> Vec<Rect> {
-    let mut ys: Vec<u32> = Vec::with_capacity(placements.len() * 2 + 2);
-    ys.push(0);
-    ys.push(sheet.height);
-    for p in placements {
-        // Clip both band boundaries to sheet.height: under edge_kerf_relief a
-        // placement may extend (or even start) past the sheet's trailing
-        // edge, but drops are only computed over the strict sheet area.
-        ys.push(p.y.min(sheet.height));
-        ys.push(p.y.saturating_add(p.height).min(sheet.height));
-    }
-    ys.sort_unstable();
-    ys.dedup();
-
+fn disjoint_partition(sheet: &Sheet2D, placements: &[ClippedPlacement], ys: &[u32]) -> Vec<Rect> {
     let mut rects = Vec::new();
     for window in ys.windows(2) {
         let y_lo = window[0];
@@ -90,11 +113,8 @@ fn disjoint_partition(sheet: &Sheet2D, placements: &[Placement2D]) -> Vec<Rect> 
         // Collect x-intervals occupied by placements that fully span this band.
         let mut occupied: Vec<(u32, u32)> = placements
             .iter()
-            .filter(|p| {
-                let p_bottom = p.y.saturating_add(p.height);
-                p.y <= y_lo && p_bottom >= y_hi
-            })
-            .map(|p| (p.x, p.x.saturating_add(p.width).min(sheet.width)))
+            .filter(|p| p.y_lo <= y_lo && p.y_hi >= y_hi)
+            .map(|p| (p.x_lo, p.x_hi))
             .collect();
         occupied.sort_unstable();
 
@@ -124,70 +144,91 @@ fn disjoint_partition(sheet: &Sheet2D, placements: &[Placement2D]) -> Vec<Rect> 
 ///
 /// Uses a slab-pair sweep over all pairs of y-band boundaries. For each
 /// slab `[y_lo, y_hi)`, placements that *intersect* the slab (i.e.,
-/// `p.y < y_hi AND p.y + p.height > y_lo`) block their x-interval for
-/// any rectangle that spans the full slab height. The widest free
-/// x-interval is found by complement; candidates with width or height
-/// below `min_usable_side` are skipped.
+/// `p.y < y_hi AND p.y + p.height > y_lo`) block their x-interval for any
+/// rectangle that spans the full slab height. For a fixed `y_lo`, blockers
+/// are added incrementally as `y_hi` advances, avoiding a fresh scan and
+/// sort for every slab. Worst-case complexity remains O(p³), but with less
+/// repeated allocation and sorting than the direct slab-pair implementation.
 fn largest_usable_free_rectangle_area(
     sheet: &Sheet2D,
-    placements: &[Placement2D],
+    placements: &[ClippedPlacement],
+    ys: &[u32],
     min_usable_side: u32,
 ) -> u64 {
-    let mut ys: Vec<u32> = Vec::with_capacity(placements.len() * 2 + 2);
-    ys.push(0);
-    ys.push(sheet.height);
-    for p in placements {
-        // Clip both band boundaries to sheet.height: under edge_kerf_relief a
-        // placement may extend (or even start) past the sheet's trailing
-        // edge, but drops are only computed over the strict sheet area.
-        ys.push(p.y.min(sheet.height));
-        ys.push(p.y.saturating_add(p.height).min(sheet.height));
-    }
-    ys.sort_unstable();
-    ys.dedup();
-
     let mut best: u64 = 0;
     for i in 0..ys.len() {
-        for j in (i + 1)..ys.len() {
-            let y_lo = ys[i];
-            let y_hi = ys[j];
+        let y_lo = ys[i];
+        let mut candidates: Vec<ClippedPlacement> =
+            placements.iter().copied().filter(|p| p.y_hi > y_lo).collect();
+        candidates.sort_unstable_by_key(|p| p.y_lo);
+
+        let mut next_candidate = 0_usize;
+        let mut occupied: Vec<(u32, u32)> = Vec::new();
+
+        for &y_hi in ys.iter().skip(i + 1) {
             let slab_height = y_hi - y_lo;
+            while next_candidate < candidates.len() && candidates[next_candidate].y_lo < y_hi {
+                let placement = candidates[next_candidate];
+                insert_merged_interval(&mut occupied, placement.x_lo, placement.x_hi);
+                next_candidate += 1;
+            }
             if slab_height < min_usable_side {
                 continue;
             }
 
-            // Placements that intersect the slab block their x-interval.
-            let mut occupied: Vec<(u32, u32)> = placements
-                .iter()
-                .filter(|p| p.y < y_hi && p.y.saturating_add(p.height) > y_lo)
-                .map(|p| (p.x, p.x.saturating_add(p.width).min(sheet.width)))
-                .collect();
-            occupied.sort_unstable();
-
-            // Find the widest free x-interval (>= min_usable_side).
-            let mut cursor = 0_u32;
-            for (start, end) in &occupied {
-                if *start > cursor {
-                    let free_width = start - cursor;
-                    if free_width >= min_usable_side {
-                        let candidate = u64::from(free_width) * u64::from(slab_height);
-                        if candidate > best {
-                            best = candidate;
-                        }
-                    }
-                }
-                cursor = cursor.max(*end);
-            }
-            if sheet.width > cursor {
-                let free_width = sheet.width - cursor;
-                if free_width >= min_usable_side {
-                    let candidate = u64::from(free_width) * u64::from(slab_height);
-                    if candidate > best {
-                        best = candidate;
-                    }
+            let free_width = widest_free_interval(sheet.width, &occupied);
+            if free_width >= min_usable_side {
+                let candidate = u64::from(free_width) * u64::from(slab_height);
+                if candidate > best {
+                    best = candidate;
                 }
             }
         }
+    }
+    best
+}
+
+fn insert_merged_interval(intervals: &mut Vec<(u32, u32)>, start: u32, end: u32) {
+    if start >= end {
+        return;
+    }
+
+    let old_intervals = std::mem::take(intervals);
+    let mut pending = Some((start, end));
+
+    for (lo, hi) in old_intervals {
+        let Some((new_lo, new_hi)) = pending else {
+            intervals.push((lo, hi));
+            continue;
+        };
+
+        if hi < new_lo {
+            intervals.push((lo, hi));
+        } else if new_hi < lo {
+            intervals.push((new_lo, new_hi));
+            intervals.push((lo, hi));
+            pending = None;
+        } else {
+            pending = Some((new_lo.min(lo), new_hi.max(hi)));
+        }
+    }
+
+    if let Some(interval) = pending {
+        intervals.push(interval);
+    }
+}
+
+fn widest_free_interval(sheet_width: u32, occupied: &[(u32, u32)]) -> u32 {
+    let mut best = 0_u32;
+    let mut cursor = 0_u32;
+    for &(start, end) in occupied {
+        if start > cursor {
+            best = best.max(start - cursor);
+        }
+        cursor = cursor.max(end);
+    }
+    if sheet_width > cursor {
+        best = best.max(sheet_width - cursor);
     }
     best
 }

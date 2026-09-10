@@ -7,6 +7,8 @@
 //! and sums `kerf * covered_length` for each distinct kerf band, clipped
 //! to the sheet.
 
+use std::collections::BTreeMap;
+
 use super::model::{Placement2D, Sheet2D};
 
 /// Total area lost to kerf lines on a single sheet.
@@ -20,8 +22,9 @@ use super::model::{Placement2D, Sheet2D};
 /// not consume kerf (the factory edge is not a cut).
 ///
 /// Returns `0` when `sheet.kerf == 0` or when there are fewer than two
-/// placements on the sheet. Complexity: O(n²) in the placement count,
-/// which is fine for realistic sheet occupancies (tens to low hundreds).
+/// placements on the sheet. Complexity: O(n log n) in the placement count:
+/// placements are grouped by matching edge coordinate, then each possible
+/// kerf band is visited once.
 pub(crate) fn kerf_area_for_layout(sheet: &Sheet2D, placements: &[Placement2D]) -> u64 {
     let kerf = sheet.kerf;
     if kerf == 0 || placements.len() < 2 {
@@ -30,91 +33,70 @@ pub(crate) fn kerf_area_for_layout(sheet: &Sheet2D, placements: &[Placement2D]) 
 
     let kerf_u64 = u64::from(kerf);
 
-    // For each distinct kerf band we track the convex hull of perpendicular
-    // spans for the pieces on each side of the gap.  The key is the gap's
-    // start coordinate; the value is (lo_a, hi_a, lo_b, hi_b) where
-    // [lo_a, hi_a) is the convex hull of spans for the "earlier" side and
-    // [lo_b, hi_b) for the "later" side.
-    //
-    // "Earlier" = the piece(s) whose edge is at `gap_start`; "later" = the
-    // piece(s) whose edge is at `gap_start + kerf`.
+    // For each edge coordinate, track the convex hull of spans on the
+    // perpendicular axis. A vertical band at x = gap_start..gap_start+kerf
+    // exists when some placement has its right edge at gap_start and some
+    // placement has its left edge at gap_start + kerf. Horizontal bands use
+    // bottom/top edges analogously.
+    let mut left_edges: BTreeMap<u32, SpanHull> = BTreeMap::new();
+    let mut right_edges: BTreeMap<u32, SpanHull> = BTreeMap::new();
+    let mut top_edges: BTreeMap<u32, SpanHull> = BTreeMap::new();
+    let mut bottom_edges: BTreeMap<u32, SpanHull> = BTreeMap::new();
 
-    // (gap_start) → (a_lo, a_hi, b_lo, b_hi)
-    let mut h_bands: std::collections::BTreeMap<u32, (u32, u32, u32, u32)> =
-        std::collections::BTreeMap::new();
-    let mut v_bands: std::collections::BTreeMap<u32, (u32, u32, u32, u32)> =
-        std::collections::BTreeMap::new();
+    for placement in placements {
+        let right = placement.x.saturating_add(placement.width);
+        let bottom = placement.y.saturating_add(placement.height);
 
-    for (i, a) in placements.iter().enumerate() {
-        let a_right = a.x.saturating_add(a.width);
-        let a_bottom = a.y.saturating_add(a.height);
-        for b in &placements[i + 1..] {
-            let b_right = b.x.saturating_add(b.width);
-            let b_bottom = b.y.saturating_add(b.height);
-
-            // Vertical kerf band: a is left of b or vice versa.
-            if let Some((gap_x, a_is_left)) = gap_start(a.x, a_right, b.x, b_right, kerf) {
-                // Perpendicular spans are in y.
-                let (left_y_lo, left_y_hi, right_y_lo, right_y_hi) = if a_is_left {
-                    (a.y, a_bottom, b.y, b_bottom)
-                } else {
-                    (b.y, b_bottom, a.y, a_bottom)
-                };
-                v_bands
-                    .entry(gap_x)
-                    .and_modify(|(alo, ahi, blo, bhi)| {
-                        *alo = (*alo).min(left_y_lo);
-                        *ahi = (*ahi).max(left_y_hi);
-                        *blo = (*blo).min(right_y_lo);
-                        *bhi = (*bhi).max(right_y_hi);
-                    })
-                    .or_insert((left_y_lo, left_y_hi, right_y_lo, right_y_hi));
-            }
-
-            // Horizontal kerf band: a is above b or vice versa.
-            if let Some((gap_y, a_is_top)) = gap_start(a.y, a_bottom, b.y, b_bottom, kerf) {
-                // Perpendicular spans are in x.
-                let (top_x_lo, top_x_hi, bot_x_lo, bot_x_hi) = if a_is_top {
-                    (a.x, a_right, b.x, b_right)
-                } else {
-                    (b.x, b_right, a.x, a_right)
-                };
-                h_bands
-                    .entry(gap_y)
-                    .and_modify(|(alo, ahi, blo, bhi)| {
-                        *alo = (*alo).min(top_x_lo);
-                        *ahi = (*ahi).max(top_x_hi);
-                        *blo = (*blo).min(bot_x_lo);
-                        *bhi = (*bhi).max(bot_x_hi);
-                    })
-                    .or_insert((top_x_lo, top_x_hi, bot_x_lo, bot_x_hi));
-            }
-        }
+        include_span(&mut left_edges, placement.x, placement.y, bottom);
+        include_span(&mut right_edges, right, placement.y, bottom);
+        include_span(&mut top_edges, placement.y, placement.x, right);
+        include_span(&mut bottom_edges, bottom, placement.x, right);
     }
 
-    let mut total: u64 = 0;
-    for (a_lo, a_hi, b_lo, b_hi) in h_bands.values().chain(v_bands.values()) {
-        let covered = hull_intersection(*a_lo, *a_hi, *b_lo, *b_hi);
-        total = total.saturating_add(kerf_u64.saturating_mul(covered));
-    }
+    let vertical_total = kerf_band_area(&right_edges, &left_edges, kerf, kerf_u64);
+    let horizontal_total = kerf_band_area(&bottom_edges, &top_edges, kerf, kerf_u64);
+    let total = vertical_total.saturating_add(horizontal_total);
 
     // Clip to sheet area as a defensive cap.
     let sheet_area = u64::from(sheet.width).saturating_mul(u64::from(sheet.height));
     total.min(sheet_area)
 }
 
-/// Returns `Some((gap_lo, a_is_earlier))` when one interval ends exactly
-/// `kerf` units before the other begins. `a_is_earlier` is `true` when `a`
-/// is the "earlier" side (its hi edge is at `gap_lo`). Returns `None`
-/// otherwise.
-fn gap_start(a_lo: u32, a_hi: u32, b_lo: u32, b_hi: u32, kerf: u32) -> Option<(u32, bool)> {
-    if a_hi <= b_lo && b_lo.saturating_sub(a_hi) == kerf {
-        return Some((a_hi, true));
+#[derive(Debug, Clone, Copy)]
+struct SpanHull {
+    lo: u32,
+    hi: u32,
+}
+
+impl SpanHull {
+    fn include(&mut self, lo: u32, hi: u32) {
+        self.lo = self.lo.min(lo);
+        self.hi = self.hi.max(hi);
     }
-    if b_hi <= a_lo && a_lo.saturating_sub(b_hi) == kerf {
-        return Some((b_hi, false));
+}
+
+fn include_span(edges: &mut BTreeMap<u32, SpanHull>, edge: u32, lo: u32, hi: u32) {
+    edges.entry(edge).and_modify(|span| span.include(lo, hi)).or_insert(SpanHull { lo, hi });
+}
+
+fn kerf_band_area(
+    earlier_edges: &BTreeMap<u32, SpanHull>,
+    later_edges: &BTreeMap<u32, SpanHull>,
+    kerf: u32,
+    kerf_u64: u64,
+) -> u64 {
+    let mut total = 0_u64;
+    for (gap_start, earlier) in earlier_edges {
+        let Some(later_edge) = gap_start.checked_add(kerf) else {
+            continue;
+        };
+        let Some(later) = later_edges.get(&later_edge) else {
+            continue;
+        };
+        let covered = hull_intersection(earlier.lo, earlier.hi, later.lo, later.hi);
+        total = total.saturating_add(kerf_u64.saturating_mul(covered));
     }
-    None
+    total
 }
 
 /// Length of the intersection of the convex hulls `[a_lo, a_hi)` and
