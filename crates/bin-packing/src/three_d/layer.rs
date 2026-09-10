@@ -235,6 +235,7 @@ fn solve_with_inner(
                 .map(|&idx| {
                     let oi = &pending[idx];
                     ItemInstance2D {
+                        fixed_rotation: None,
                         name: format!("__layer_item_{idx}__"),
                         width: oi.x_extent,
                         height: oi.z_extent,

@@ -249,7 +249,8 @@ pub struct TwoDOptions {
     /// uses exhaustive enumeration. When the number of rotatable types
     /// exceeds this threshold, rotation search switches to sampling
     /// `multistart_runs` random assignments instead. Also controls whether
-    /// Auto mode includes rotation search as a candidate.
+    /// Auto mode includes rotation search as a candidate. Exhaustive search
+    /// is additionally capped at 16 types (65,536 assignments); larger jobs sample.
     #[serde(default = "default_auto_rotation_search_max_types")]
     pub auto_rotation_search_max_types: usize,
 }
@@ -274,15 +275,22 @@ pub(crate) struct ItemInstance2D {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) can_rotate: bool,
+    /// Restrict search without changing original dimensions or rotation permission.
+    pub(crate) fixed_rotation: Option<bool>,
 }
 
 impl ItemInstance2D {
     pub(crate) fn orientations(&self) -> impl Iterator<Item = (u32, u32, bool)> + '_ {
-        let primary = std::iter::once((self.width, self.height, false));
+        let primary = (self.fixed_rotation != Some(true))
+            .then_some((self.width, self.height, false))
+            .into_iter();
         let rotated = self
             .can_rotate
             .then_some((self.height, self.width, true))
-            .filter(|(width, height, _)| *width != self.width || *height != self.height)
+            .filter(|(width, height, _)| {
+                self.fixed_rotation != Some(false)
+                    && (*width != self.width || *height != self.height)
+            })
             .into_iter();
         primary.chain(rotated)
     }
@@ -505,6 +513,7 @@ impl TwoDProblem {
         for demand in &self.demands {
             for _ in 0..demand.quantity {
                 items.push(ItemInstance2D {
+                    fixed_rotation: None,
                     name: demand.name.clone(),
                     width: demand.width,
                     height: demand.height,
@@ -994,8 +1003,20 @@ mod tests {
                 ),
             ],
             vec![
-                ItemInstance2D { name: "wide".to_string(), width: 6, height: 2, can_rotate: true },
-                ItemInstance2D { name: "tiny".to_string(), width: 1, height: 1, can_rotate: false },
+                ItemInstance2D {
+                    fixed_rotation: None,
+                    name: "wide".to_string(),
+                    width: 6,
+                    height: 2,
+                    can_rotate: true,
+                },
+                ItemInstance2D {
+                    fixed_rotation: None,
+                    name: "tiny".to_string(),
+                    width: 1,
+                    height: 1,
+                    can_rotate: false,
+                },
             ],
             SolverMetrics2D { iterations: 3, explored_states: 2, notes: vec!["test".to_string()] },
             0,
@@ -1116,8 +1137,13 @@ mod tests {
     /// That avoids the solver double-evaluating an identical placement.
     #[test]
     fn item_orientations_collapse_squares_to_one_arm() {
-        let square =
-            ItemInstance2D { name: "square".to_string(), width: 5, height: 5, can_rotate: true };
+        let square = ItemInstance2D {
+            fixed_rotation: None,
+            name: "square".to_string(),
+            width: 5,
+            height: 5,
+            can_rotate: true,
+        };
         let orientations = square.orientations().collect::<Vec<_>>();
         assert_eq!(
             orientations.len(),
@@ -1126,15 +1152,25 @@ mod tests {
         );
         assert_eq!(orientations[0], (5, 5, false));
 
-        let non_square =
-            ItemInstance2D { name: "rect".to_string(), width: 3, height: 7, can_rotate: true };
+        let non_square = ItemInstance2D {
+            fixed_rotation: None,
+            name: "rect".to_string(),
+            width: 3,
+            height: 7,
+            can_rotate: true,
+        };
         let orientations = non_square.orientations().collect::<Vec<_>>();
         assert_eq!(orientations.len(), 2);
         assert_eq!(orientations[0], (3, 7, false));
         assert_eq!(orientations[1], (7, 3, true));
 
-        let non_rotatable =
-            ItemInstance2D { name: "rect".to_string(), width: 3, height: 7, can_rotate: false };
+        let non_rotatable = ItemInstance2D {
+            fixed_rotation: None,
+            name: "rect".to_string(),
+            width: 3,
+            height: 7,
+            can_rotate: false,
+        };
         let orientations = non_rotatable.orientations().collect::<Vec<_>>();
         assert_eq!(orientations.len(), 1);
         assert_eq!(orientations[0], (3, 7, false));

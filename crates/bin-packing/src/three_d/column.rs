@@ -165,6 +165,7 @@ pub(super) fn solve_column_building(
             .map(|&index| {
                 let stack = &pending[index];
                 ItemInstance2D {
+                    fixed_rotation: None,
                     name: format!("__stack_{index}__"),
                     width: stack.footprint_x,
                     height: stack.footprint_z,

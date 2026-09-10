@@ -714,10 +714,34 @@ mod tests {
         use super::place_into_sheet;
 
         let items = vec![
-            ItemInstance2D { name: "a".into(), width: 4, height: 4, can_rotate: false },
-            ItemInstance2D { name: "b".into(), width: 4, height: 4, can_rotate: false },
-            ItemInstance2D { name: "c".into(), width: 4, height: 4, can_rotate: false },
-            ItemInstance2D { name: "d".into(), width: 4, height: 4, can_rotate: false },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "a".into(),
+                width: 4,
+                height: 4,
+                can_rotate: false,
+            },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "b".into(),
+                width: 4,
+                height: 4,
+                can_rotate: false,
+            },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "c".into(),
+                width: 4,
+                height: 4,
+                can_rotate: false,
+            },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "d".into(),
+                width: 4,
+                height: 4,
+                can_rotate: false,
+            },
         ];
         let options = TwoDOptions::default();
 
@@ -748,8 +772,13 @@ mod tests {
         use super::model::ItemInstance2D;
         use super::place_into_sheet;
 
-        let items =
-            vec![ItemInstance2D { name: "huge".into(), width: 20, height: 20, can_rotate: false }];
+        let items = vec![ItemInstance2D {
+            fixed_rotation: None,
+            name: "huge".into(),
+            width: 20,
+            height: 20,
+            can_rotate: false,
+        }];
         let (placements, leftover) =
             place_into_sheet(&items, 10, 10, TwoDAlgorithm::MaxRects, &TwoDOptions::default())
                 .expect("place");

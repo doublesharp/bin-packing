@@ -296,6 +296,7 @@ fn pack_single_bin(bin: &Bin3D, items: Vec<WallItem>) -> Result<(Vec<Placement3D
         let items_2d: Vec<ItemInstance2D> = candidates
             .iter()
             .map(|wall_item| ItemInstance2D {
+                fixed_rotation: None,
                 name: wall_item.item.name.clone(),
                 width: wall_item.x_extent,
                 height: wall_item.y_extent,

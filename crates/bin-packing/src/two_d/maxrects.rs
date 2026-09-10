@@ -734,10 +734,34 @@ mod tests {
     #[test]
     fn multistart_ordering_is_seeded_and_explores_tie_groups() {
         let items = vec![
-            ItemInstance2D { name: "A".to_string(), width: 10, height: 10, can_rotate: true },
-            ItemInstance2D { name: "B".to_string(), width: 10, height: 10, can_rotate: true },
-            ItemInstance2D { name: "C".to_string(), width: 10, height: 10, can_rotate: true },
-            ItemInstance2D { name: "D".to_string(), width: 10, height: 10, can_rotate: true },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "A".to_string(),
+                width: 10,
+                height: 10,
+                can_rotate: true,
+            },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "B".to_string(),
+                width: 10,
+                height: 10,
+                can_rotate: true,
+            },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "C".to_string(),
+                width: 10,
+                height: 10,
+                can_rotate: true,
+            },
+            ItemInstance2D {
+                fixed_rotation: None,
+                name: "D".to_string(),
+                width: 10,
+                height: 10,
+                can_rotate: true,
+            },
         ];
 
         let mut first_rng = SmallRng::seed_from_u64(7);
