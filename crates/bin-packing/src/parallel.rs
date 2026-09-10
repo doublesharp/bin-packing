@@ -8,11 +8,13 @@
 
 /// Returns `true` when parallel execution is both compiled-in and useful
 /// on the current host (i.e. more than one hardware thread is available).
+#[cfg(feature = "parallel")]
 pub(crate) fn use_parallel() -> bool {
     cfg!(feature = "parallel") && core_count() > 1
 }
 
 /// Number of hardware threads available to the process (cached after first call).
+#[cfg(feature = "parallel")]
 fn core_count() -> usize {
     static CORES: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     *CORES.get_or_init(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
@@ -50,10 +52,10 @@ where
 mod tests {
     use super::*;
 
+    #[cfg(feature = "parallel")]
     #[test]
     fn use_parallel_returns_consistent_value() {
-        // Just verify it doesn't panic and returns a bool.
-        let _ = use_parallel();
+        assert_eq!(use_parallel(), core_count() > 1);
     }
 
     #[test]

@@ -111,7 +111,7 @@
     "build:web": "node scripts/build.mjs --target web",
     "build:nodejs": "node scripts/build.mjs --target nodejs",
     "clean": "node -e \"import('node:fs').then(fs => fs.promises.rm('dist', { recursive: true, force: true }))\"",
-    "test": "node --test test/smoke.test.mjs",
+    "test": "node --experimental-wasm-modules --test test/*.test.mjs",
     "prepack": "node scripts/build.mjs"
   }
 }

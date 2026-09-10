@@ -313,7 +313,7 @@ impl SearchContext<'_> {
 // Cloneable snapshot of `BinState`
 // ---------------------------------------------------------------------------
 
-/// Deep-clonable snapshot of an [`BinState`]. `BinState` itself is not
+/// Deep-cloneable snapshot of a [`BinState`]. `BinState` itself is not
 /// `Clone` (by design — it is owned by the EP engine's mutable loop),
 /// so the branch-and-bound search uses this intermediate representation
 /// to branch without aliasing mutable state.

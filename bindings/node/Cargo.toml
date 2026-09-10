@@ -11,7 +11,7 @@ napi.workspace = true
 napi-derive.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-bin-packing = { path = "../../crates/bin-packing" }
+bin-packing = { path = "../../crates/bin-packing", default-features = false }
 
 [features]
 default = ["one-d", "two-d", "three-d", "parallel"]

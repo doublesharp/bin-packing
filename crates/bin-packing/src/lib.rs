@@ -116,7 +116,7 @@ pub mod cut_plan;
 mod error;
 #[cfg(feature = "one-d")]
 pub mod one_d;
-#[cfg_attr(not(feature = "parallel"), allow(dead_code))]
+#[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 mod parallel;
 #[cfg(feature = "two-d")]
 pub mod two_d;

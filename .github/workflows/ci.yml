@@ -15,7 +15,7 @@ env:
 
 jobs:
   rust:
-    name: Rust checks
+    name: Quality gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,17 +27,16 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Format
-        run: cargo fmt --all --check
+      - name: Install repo quality tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli,typos-cli
 
-      - name: Build
-        run: cargo build --workspace --all-targets --all-features --locked
+      - name: Run repo quality gate
+        run: ./scripts/check-quality.sh
 
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-
-      - name: Test
-        run: cargo test --workspace --all-targets --all-features --locked
+      - name: Check feature combinations and fuzz project
+        run: ./scripts/check-features.sh
 
   node:
     name: Node binding
@@ -71,6 +70,9 @@ jobs:
       - name: Test native binding
         run: pnpm --dir bindings/node test
 
+      - name: Test packed native package
+        run: node bindings/test/package-native.cjs
+
   wasm:
     name: WebAssembly package
     runs-on: ubuntu-latest
@@ -100,6 +102,9 @@ jobs:
 
       - name: Test wasm package
         run: npm --prefix bindings/wasm test
+
+      - name: Test packed WASM entry points
+        run: node bindings/test/package-wasm.mjs
 
   node-native-release:
     name: Build Node native ${{ matrix.target }}

@@ -435,7 +435,7 @@ fuzz_target!(|data: &[u8]| {
         multistart_runs: usize::from(input.multistart_runs.max(1)).min(5),
         improvement_rounds: usize::from(input.improvement_rounds).min(8),
         beam_width: usize::from(input.beam_width.max(1)).min(8),
-        branch_and_bound_node_limit: usize::from(input.branch_and_bound_node_limit).max(1).min(512),
+        branch_and_bound_node_limit: usize::from(input.branch_and_bound_node_limit).clamp(1, 512),
         guillotine_required: input.guillotine_required,
         ..ThreeDOptions::default()
     };

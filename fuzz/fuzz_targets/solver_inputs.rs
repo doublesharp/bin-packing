@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use arbitrary::{Arbitrary, Unstructured};
 use bin_packing::BinPackingError;
+use bin_packing::cut_plan::CutPlanError;
 use bin_packing::one_d::{
     CutDemand1D, OneDAlgorithm, OneDOptions, OneDProblem, OneDSolution, Stock1D, solve_1d,
 };
@@ -11,12 +12,11 @@ use bin_packing::three_d::{
     Bin3D, BoxDemand3D, RotationMask3D, ThreeDAlgorithm, ThreeDOptions, ThreeDProblem,
     ThreeDSolution, solve_3d,
 };
-use bin_packing::cut_plan::CutPlanError;
+use bin_packing::two_d::cut_plan::{CutPlanOptions2D, CutPlanPreset2D, plan_cuts};
 use bin_packing::two_d::{
     Placement2D, RectDemand2D, Sheet2D, TwoDAlgorithm, TwoDOptions, TwoDProblem, TwoDSolution,
     solve_2d,
 };
-use bin_packing::two_d::cut_plan::{CutPlanOptions2D, CutPlanPreset2D, plan_cuts};
 use libfuzzer_sys::fuzz_target;
 
 // Keep problem sizes small so the beam search and exact backends stay fast enough
@@ -704,8 +704,7 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
                 .saturating_add(placement.height)
                 .min(sheet.height)
                 .saturating_sub(placement.y);
-            used_area = used_area
-                .saturating_add(u64::from(on_sheet_w) * u64::from(on_sheet_h));
+            used_area = used_area.saturating_add(u64::from(on_sheet_w) * u64::from(on_sheet_h));
         }
 
         assert_eq!(layout.used_area, used_area, "layout used_area mismatch");
@@ -735,10 +734,8 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
                     if y_overlap {
                         let gap = if a_right <= b.x {
                             b.x - a_right
-                        } else if b_right <= a.x {
-                            a.x - b_right
                         } else {
-                            0
+                            a.x.saturating_sub(b_right)
                         };
                         assert!(
                             gap >= kerf,
@@ -750,10 +747,8 @@ fn assert_two_d_invariants(problem: &TwoDProblem, solution: &TwoDSolution) {
                     if x_overlap {
                         let gap = if a_bottom <= b.y {
                             b.y - a_bottom
-                        } else if b_bottom <= a.y {
-                            a.y - b_bottom
                         } else {
-                            0
+                            a.y.saturating_sub(b_bottom)
                         };
                         assert!(
                             gap >= kerf,
@@ -986,12 +981,8 @@ fuzz_target!(|data: &[u8]| {
     // Clamp min_usable_side to keep the threshold below the smallest sheet
     // side (validation allows up to kerf*2 < min_side; for consolidation we
     // just need it plausible and bounded).
-    let min_sheet_side = two_d_problem
-        .sheets
-        .iter()
-        .map(|s| s.width.min(s.height))
-        .min()
-        .unwrap_or(1);
+    let min_sheet_side =
+        two_d_problem.sheets.iter().map(|s| s.width.min(s.height)).min().unwrap_or(1);
     let min_usable_side =
         u32::from(two_d.min_usable_side % 16).min(min_sheet_side.saturating_sub(1));
     let two_d_options = TwoDOptions {
@@ -1008,10 +999,9 @@ fuzz_target!(|data: &[u8]| {
         Ok(solution) => {
             assert_two_d_invariants(&two_d_problem, &solution);
 
-            // When `guillotine_required` is set, the returned layout must be
-            // guillotine-compatible; otherwise the caller has been given an
-            // uncuttable plan.
-            if guillotine_required {
+            // This flag filters Auto's candidate set. Explicit algorithms keep
+            // their own compatibility contract (see docs/two-d/auto.md).
+            if guillotine_required && two_d_algorithm == TwoDAlgorithm::Auto {
                 assert!(
                     solution.guillotine,
                     "guillotine_required=true but solution.guillotine=false"
@@ -1020,8 +1010,7 @@ fuzz_target!(|data: &[u8]| {
 
             // Post-condition: cut plan must succeed (or fail with the only
             // expected error) and, when Ok, must produce a finite total cost.
-            let cut_options =
-                CutPlanOptions2D { preset: cut_plan_preset, ..Default::default() };
+            let cut_options = CutPlanOptions2D { preset: cut_plan_preset, ..Default::default() };
             match plan_cuts(&solution, &cut_options) {
                 Ok(cut_plan) => {
                     assert!(

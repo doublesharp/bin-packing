@@ -1,0 +1,11 @@
+[files]
+extend-exclude = [
+  ".git/",
+  ".npm-cache/",
+  "Cargo.lock",
+  "fuzz/Cargo.lock",
+  "bindings/node/pnpm-lock.yaml",
+  "bindings/wasm/pnpm-lock.yaml",
+  "docs/*.png",
+  "target/",
+]

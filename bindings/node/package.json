@@ -44,7 +44,8 @@
     "build:debug": "napi build --platform",
     "create:npm-dirs": "napi create-npm-dirs",
     "prepublish:native": "napi pre-publish --tag-style npm",
-    "test": "node --test test/smoke.test.js"
+    "test": "node --test test/smoke.test.js ../test/finder.test.cjs",
+    "test:package": "node ../test/package-native.cjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.6.1"

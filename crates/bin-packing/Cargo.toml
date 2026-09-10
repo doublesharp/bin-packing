@@ -33,12 +33,33 @@ serde_json.workspace = true
 [[bench]]
 name = "solver_benches"
 harness = false
+required-features = ["one-d", "two-d", "three-d"]
 
 [lints]
 workspace = true
 
 [[example]]
 name = "saw_planner"
+required-features = ["two-d"]
+
+[[test]]
+name = "solver_regressions"
+required-features = ["one-d", "two-d", "three-d"]
+
+[[test]]
+name = "cut_plan_integration"
+required-features = ["one-d", "two-d"]
+
+[[test]]
+name = "consolidation_2d"
+required-features = ["two-d"]
+
+[[test]]
+name = "edge_kerf_relief_2d"
+required-features = ["two-d"]
+
+[[test]]
+name = "kerf_2d_regressions"
 required-features = ["two-d"]
 
 [[example]]
