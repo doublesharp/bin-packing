@@ -1,36 +1,13 @@
-// Additional type declarations appended to the `web` target's `.d.ts`.
-// The `web` target produced by wasm-bindgen requires an explicit `init()`
-// call that loads and instantiates the `.wasm` file. This matches the
-// original wasm-bindgen `web` template.
+// Web initialization returns raw WASM exports, not the ergonomic object API.
+// Keep the ABI tied to the declarations generated for this exact WASM binary.
+export type InitOutput = typeof import('./bin_packing_wasm_bg.wasm');
+export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
+export type SyncInitInput = BufferSource | WebAssembly.Module;
 
-/**
- * Initialize the WebAssembly module. Required before calling any of the
- * exported functions on the `web` target.
- *
- * Pass a URL, `Response`, `BufferSource`, or pre-compiled `WebAssembly.Module`
- * pointing at the packaged `.wasm` file. Call with no arguments to let the
- * runtime pick a default path relative to the importing module's URL.
- */
+/** Initialize once before calling the module-level solve and cut functions. */
 export default function init(
-  module_or_path?:
-    | { module_or_path: RequestInfo | URL | Response | BufferSource | WebAssembly.Module }
-    | RequestInfo
-    | URL
-    | Response
-    | BufferSource
-    | WebAssembly.Module,
+  module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>,
 ): Promise<InitOutput>;
 
-/** Object returned by `init()` — same shape as the module's top-level exports. */
-export interface InitOutput {
-  readonly memory: WebAssembly.Memory;
-  readonly solve1d: typeof solve1d;
-  readonly solve2d: typeof solve2d;
-  readonly solve3d: typeof solve3d;
-  readonly solve1dJson: typeof solve1dJson;
-  readonly solve2dJson: typeof solve2dJson;
-  readonly solve3dJson: typeof solve3dJson;
-  readonly plan1dCuts: typeof plan1dCuts;
-  readonly plan2dCuts: typeof plan2dCuts;
-  readonly version: typeof version;
-}
+/** Synchronous initialization from bytes or an already compiled module. */
+export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;

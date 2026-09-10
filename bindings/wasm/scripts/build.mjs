@@ -137,11 +137,17 @@ async function renameJsToCjs(outDir) {
 }
 
 async function main() {
-  await rm(resolve(packageDir, 'dist'), { recursive: true, force: true });
+  const args = process.argv.slice(2);
+  if (args.length && (args.length !== 2 || args[0] !== '--target' || !targetFlavors.some(t => t.flag === args[1]))) {
+    throw new Error('Usage: node scripts/build.mjs [--target bundler|web|nodejs]');
+  }
+  const targets = args.length ? targetFlavors.filter(t => t.flag === args[1]) : targetFlavors;
+  if (!args.length) await rm(resolve(packageDir, 'dist'), { recursive: true, force: true });
 
   for (const variant of variants) {
-    for (const target of targetFlavors) {
+    for (const target of targets) {
       const outDir = `${variant.distPrefix}/${target.subdir}`;
+      await rm(resolve(packageDir, outDir), { recursive: true, force: true });
       console.log(`\n== ${variant.name}: wasm-pack build --target ${target.flag} ==`);
       await run(
         'wasm-pack',

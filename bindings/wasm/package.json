@@ -93,7 +93,9 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": ["*.wasm"],
+  "sideEffects": [
+    "*.wasm"
+  ],
   "files": [
     "dist/",
     "README.md",
@@ -105,9 +107,9 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "build:bundler": "wasm-pack build --release --target bundler --out-dir dist/bundler --out-name bin_packing_wasm",
-    "build:web": "wasm-pack build --release --target web --out-dir dist/web --out-name bin_packing_wasm",
-    "build:nodejs": "wasm-pack build --release --target nodejs --out-dir dist/nodejs --out-name bin_packing_wasm",
+    "build:bundler": "node scripts/build.mjs --target bundler",
+    "build:web": "node scripts/build.mjs --target web",
+    "build:nodejs": "node scripts/build.mjs --target nodejs",
     "clean": "node -e \"import('node:fs').then(fs => fs.promises.rm('dist', { recursive: true, force: true }))\"",
     "test": "node --test test/smoke.test.mjs",
     "prepack": "node scripts/build.mjs"
