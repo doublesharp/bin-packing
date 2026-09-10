@@ -1,14 +1,18 @@
 //! WebAssembly bindings for the `bin-packing` crate.
 //!
 //! Exposes dimension-specific `#[wasm_bindgen]` entry points.
-//! The plain-object functions use `serde-wasm-bindgen`, so callers can pass
-//! ordinary JavaScript objects without an intermediate JSON string. The default
+//! The plain-object functions bridge through JSON internally so callers can
+//! pass ordinary JavaScript objects and receive numeric aggregate metrics. The default
 //! combined build also exposes JSON-string helpers for compatibility with the
 //! Node binding; dimension-specific builds omit those helpers to keep browser
 //! payloads smaller.
 //!
 //! `bin-packing` errors are translated into JavaScript exceptions with the original
 //! error message preserved.
+
+#[cfg(feature = "two-d")]
+#[path = "../../two_d_input.rs"]
+mod two_d_input;
 
 #[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 use serde::Serialize;
@@ -21,7 +25,7 @@ use bin_packing::one_d::{OneDOptions, OneDProblem, OneDSolution, solve_1d};
 #[cfg(feature = "three-d")]
 use bin_packing::three_d::{ThreeDOptions, ThreeDProblem, solve_3d};
 #[cfg(feature = "two-d")]
-use bin_packing::two_d::{TwoDOptions, TwoDProblem, TwoDSolution, solve_2d};
+use bin_packing::two_d::{TwoDOptions, TwoDProblem, solve_2d};
 
 /// Solve a 1D cutting-stock problem. Accepts a plain JS object matching the
 /// `OneDProblem` shape and an optional options object. Returns the solution
@@ -117,7 +121,8 @@ pub fn plan_1d_cuts_js(
 #[wasm_bindgen(js_name = plan2dCuts)]
 pub fn plan_2d_cuts_js(solution: JsValue, options: JsValue) -> Result<JsValue, JsError> {
     use bin_packing::two_d::cut_plan::{CutPlanOptions2D, plan_cuts};
-    let solution = from_js_value::<TwoDSolution>(solution, "solution")?;
+    let solution =
+        from_js_value::<two_d_input::CutSolutionInput>(solution, "solution")?.into_solution();
     let options = options_from_js::<CutPlanOptions2D>(options)?;
     let cut_plan = plan_cuts(&solution, &options).map_err(to_js_error)?;
     to_js_value(&cut_plan)
@@ -129,12 +134,24 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+// The plain-object entry points bridge through serde_json rather than
+// serde-wasm-bindgen so that `u64`/`u128` solution fields behave like the Node
+// binding and the published `.d.ts` types: they round-trip as plain JS
+// numbers. serde-wasm-bindgen would instead emit `u128` as a `BigInt` (which
+// `JSON.stringify` refuses and which the `.d.ts` declares as `number`) and
+// would *error* on any `u64` above 2^53 (turning a valid large-coordinate
+// solution into a thrown exception). Dimensions are `u32` and always exact;
+// only the large aggregate metrics (areas/volumes) are subject to the same
+// f64 precision limit they already carry under the JSON contract.
 #[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn from_js_value<T: DeserializeOwned>(value: JsValue, field: &str) -> Result<T, JsError> {
     if value.is_undefined() || value.is_null() {
         return Err(JsError::new(&format!("`{field}` is required")));
     }
-    serde_wasm_bindgen::from_value(value)
+    let json = js_sys::JSON::stringify(&value).ok().and_then(|text| text.as_string()).ok_or_else(
+        || JsError::new(&format!("failed to decode `{field}`: not JSON-serializable")),
+    )?;
+    serde_json::from_str(&json)
         .map_err(|error| JsError::new(&format!("failed to decode `{field}`: {error}")))
 }
 
@@ -143,22 +160,28 @@ fn options_from_js<T: DeserializeOwned + Default>(value: JsValue) -> Result<T, J
     if value.is_undefined() || value.is_null() {
         return Ok(T::default());
     }
-    serde_wasm_bindgen::from_value(value)
+    let json = js_sys::JSON::stringify(&value)
+        .ok()
+        .and_then(|text| text.as_string())
+        .ok_or_else(|| JsError::new("failed to decode `options`: not JSON-serializable"))?;
+    serde_json::from_str(&json)
         .map_err(|error| JsError::new(&format!("failed to decode `options`: {error}")))
 }
 
 #[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 fn to_js_value<T: Serialize>(value: &T) -> Result<JsValue, JsError> {
-    serde_wasm_bindgen::to_value(value)
-        .map_err(|error| JsError::new(&format!("failed to encode solution: {error}")))
+    let json = serde_json::to_string(value)
+        .map_err(|error| JsError::new(&format!("failed to encode solution: {error}")))?;
+    js_sys::JSON::parse(&json)
+        .map_err(|_| JsError::new("failed to encode solution: result is not valid JSON"))
 }
 
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", any(feature = "one-d", feature = "two-d", feature = "three-d")))]
 fn parse_json<T: DeserializeOwned>(input: &str) -> Result<T, JsError> {
     serde_json::from_str(input).map_err(to_js_error)
 }
 
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", any(feature = "one-d", feature = "two-d", feature = "three-d")))]
 fn options_from_json<T: DeserializeOwned + Default>(input: Option<&str>) -> Result<T, JsError> {
     match input {
         Some(text) => parse_json::<T>(text),

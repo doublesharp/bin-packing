@@ -14,8 +14,15 @@ name = "bin_packing_wasm"
 
 [dependencies]
 bin-packing = { path = "../../crates/bin-packing", default-features = false }
+js-sys = "0.3"
 serde.workspace = true
-serde_json = { workspace = true, optional = true }
+# Not optional: the plain-object entry points bridge through serde_json (via
+# `JSON.stringify`/`JSON.parse`) so that `u64`/`u128` solution fields are
+# emitted as plain JS numbers — matching the Node binding and the published
+# `.d.ts` types — instead of `BigInt` (which serde-wasm-bindgen would produce
+# for `u128`, breaking `JSON.stringify`) or a hard error (which it produces for
+# `u64` values above 2^53).
+serde_json.workspace = true
 serde-wasm-bindgen.workspace = true
 wasm-bindgen.workspace = true
 
@@ -25,7 +32,9 @@ one-d = ["bin-packing/one-d"]
 two-d = ["bin-packing/two-d"]
 three-d = ["bin-packing/three-d"]
 three-d-preview = ["three-d"]
-json = ["dep:serde_json"]
+# Marker feature gating the JSON-string `solve*Json` helpers. serde_json itself
+# is always a dependency (see note above).
+json = []
 
 [lints]
 workspace = true

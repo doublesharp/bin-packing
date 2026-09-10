@@ -92,3 +92,7 @@ test('plan2dCuts generates a cut plan for a 2D solution', () => {
   assert.ok(plan.sheet_plans.length > 0, 'should have at least one sheet plan');
   assert.equal(plan.preset, 'table_saw', 'default preset should be table_saw');
 });
+
+test('consumer package contract includes large solve-to-cut roundtrips', () => {
+  require('../../test/package-contract.cjs').packageContract(require('..'));
+});

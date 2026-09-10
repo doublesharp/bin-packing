@@ -65,6 +65,7 @@ name = "bin-packing-wasm"
 version = "0.3.0"
 dependencies = [
  "bin-packing",
+ "js-sys",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

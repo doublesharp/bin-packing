@@ -1,3 +1,7 @@
+#[cfg(feature = "two-d")]
+#[path = "../../two_d_input.rs"]
+mod two_d_input;
+
 #[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 use napi::Error;
 use napi_derive::napi;
@@ -60,9 +64,8 @@ pub fn plan1d_cuts(
 #[napi]
 #[cfg(feature = "two-d")]
 pub fn plan2d_cuts(solution_json: String, options_json: Option<String>) -> napi::Result<String> {
-    use bin_packing::two_d::TwoDSolution;
     use bin_packing::two_d::cut_plan::{CutPlanOptions2D, plan_cuts};
-    let solution = parse_json::<TwoDSolution>(&solution_json)?;
+    let solution = parse_json::<two_d_input::CutSolutionInput>(&solution_json)?.into_solution();
     let options = options_json
         .as_deref()
         .map(parse_json::<CutPlanOptions2D>)
