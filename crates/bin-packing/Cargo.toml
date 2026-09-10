@@ -36,3 +36,11 @@ harness = false
 
 [lints]
 workspace = true
+
+[[example]]
+name = "saw_planner"
+required-features = ["two-d"]
+
+[[example]]
+name = "saw_stress"
+required-features = ["two-d"]

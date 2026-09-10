@@ -10,6 +10,7 @@ mod kerf;
 mod maxrects;
 mod model;
 mod rotation_search;
+pub mod saw_plan;
 mod shelf;
 mod skyline;
 
