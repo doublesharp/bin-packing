@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - "codex/**"
+      - "feature/**"
     tags:
       - "v*"
 
@@ -106,6 +107,14 @@ jobs:
       - name: Test packed WASM entry points
         run: node bindings/test/package-wasm.mjs
 
+      - name: Upload tested WASM package
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-dist
+          path: bindings/wasm/dist
+          if-no-files-found: error
+
   node-native-release:
     name: Build Node native ${{ matrix.target }}
     if: startsWith(github.ref, 'refs/tags/v')
@@ -156,6 +165,17 @@ jobs:
 
       - name: Build native package
         run: pnpm --dir bindings/node exec napi build --platform --release --target ${{ matrix.target }}
+
+      - name: Test native artifact
+        run: pnpm --dir bindings/node test
+
+      - name: Upload native loader
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v7
+        with:
+          name: node-loader
+          path: bindings/node/index.js
+          if-no-files-found: error
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
@@ -209,6 +229,12 @@ jobs:
           path: bindings/node/artifacts
           merge-multiple: true
 
+      - name: Download native loader
+        uses: actions/download-artifact@v8
+        with:
+          name: node-loader
+          path: bindings/node
+
       - name: Verify tag version
         run: |
           node <<'JS'
@@ -234,6 +260,22 @@ jobs:
         run: |
           pnpm --dir bindings/node exec napi create-npm-dirs
           pnpm --dir bindings/node exec napi artifacts --output-dir artifacts
+          pnpm --dir bindings/node exec napi pre-publish --tag-style npm --no-gh-release --skip-optional-publish
+
+      - name: Verify prepared native package
+        run: node bindings/test/package-native.cjs --release
+
+      - name: Download tested WASM package
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-dist
+          path: bindings/wasm/dist
+
+      - name: Verify prepared WASM package
+        run: node bindings/test/package-wasm.mjs
+
+      - name: Verify publishable Rust crate
+        run: cargo publish -p bin-packing --locked --dry-run
 
       - name: Publish native npm packages
         run: |
@@ -245,24 +287,15 @@ jobs:
         run: npm publish --access public --provenance
         working-directory: bindings/node
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-
       - name: Publish Rust crate
         run: cargo publish -p bin-packing --locked
 
-      - name: Install wasm target
-        run: rustup target add wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
-      - name: Install WASM package dependencies
-        run: npm install
-        working-directory: bindings/wasm
-
       - name: Publish WASM package
-        run: npm publish --access public --provenance
+        run: npm publish --ignore-scripts --access public --provenance
         working-directory: bindings/wasm
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: docs/releases/${{ github.ref_name }}.md
+          generate_release_notes: true

@@ -15,6 +15,7 @@ try {
   const probe=join(root,'probe.mjs');
   await writeFile(probe,`
 import {readFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
 import {packageContract} from ${JSON.stringify(new URL('./package-contract.cjs',import.meta.url).href)};
 const metadata=JSON.parse(await readFile(new URL('./package.json',import.meta.url),'utf8'));
 let checked=0;
@@ -22,6 +23,7 @@ for(const [key,entry]of Object.entries(metadata.exports)) {
  if(!entry.types)continue;
  const api=await import(metadata.name+(key==='.'?'':key.slice(1)));
  if(key.endsWith('/web'))await api.default({module_or_path:await readFile(new URL(entry.default.replace(/\\.js$/, '_bg.wasm'),import.meta.url))});
+ assert.equal(api.version(),metadata.version,'WASM binary version must match its package');
  const variant=['one-d','two-d','three-d'].find(d=>key.includes(d));
  packageContract(api,variant?[['one-d','two-d','three-d'].indexOf(variant)+1]:[1,2,3]);checked++;
 }
