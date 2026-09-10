@@ -324,3 +324,7 @@ For the full design rationale and algorithmic details, see the spec at
   seed.
 - Identical `(problem, options)` pairs — with a fixed `seed` where
   applicable — produce bit-identical output.
+
+For executable table/panel-saw jobs on existing layouts, see the opt-in
+[workpiece-aware saw planner](saw-planner.md), its [measurements](saw-planner-results.md),
+and the [future effort-aware packing design](effort-aware-packing.md).

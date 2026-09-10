@@ -162,3 +162,11 @@ binaries, see
 ## License
 
 MIT
+
+### Workpiece-aware saw jobs
+
+`plan2dSawCuts(job, options?)` is the opt-in physical planner. Supply the original
+problem, layouts, and explicit stock/demand index maps. It returns one ordered job
+with workpiece ancestry, kerf bands, real settings and measured operation counts.
+See [the API and migration guide](../../docs/two-d/saw-planner.md) and run
+`node ../../examples/saw-planner.mjs native` after building this package.

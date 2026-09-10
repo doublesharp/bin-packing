@@ -1,0 +1,6688 @@
+{
+  "strips_legacy": {
+    "preset": "table_saw",
+    "effective_costs": {
+      "cut_cost": 1,
+      "rotate_cost": 2,
+      "fence_reset_cost": 0.5,
+      "tool_up_down_cost": 0,
+      "travel_cost": 0
+    },
+    "sheet_plans": [
+      {
+        "sheet_name": "sheet",
+        "sheet_index_in_solution": 0,
+        "total_cost": 4,
+        "num_cuts": 3,
+        "num_rotations": 0,
+        "num_fence_resets": 2,
+        "num_tool_ups": 0,
+        "travel_distance": 0,
+        "steps": [
+          {
+            "kind": "cut",
+            "axis": "vertical",
+            "position": 300
+          },
+          {
+            "kind": "fence_reset",
+            "new_position": 600
+          },
+          {
+            "kind": "cut",
+            "axis": "vertical",
+            "position": 600
+          },
+          {
+            "kind": "fence_reset",
+            "new_position": 900
+          },
+          {
+            "kind": "cut",
+            "axis": "vertical",
+            "position": 900
+          }
+        ]
+      }
+    ],
+    "total_cost": 4
+  },
+  "strips_physical": {
+    "counts": {
+      "cuts": 3,
+      "initial_setups": 1,
+      "setup_changes": 0,
+      "rotations": 0,
+      "handling": 3
+    },
+    "effort_score": 11,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1200,
+            "height": 600
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1200,
+            "height": 600
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "rip_fence",
+            "distance": 300
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1200,
+            "height": 600
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 300,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 300,
+            "y": 0,
+            "width": 0,
+            "height": 600
+          },
+          "segment": {
+            "from_x": 300,
+            "from_y": 0,
+            "to_x": 300,
+            "to_y": 600
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 300,
+                "height": 600
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 300,
+                "y": 0,
+                "width": 900,
+                "height": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 300,
+            "y": 0,
+            "width": 900,
+            "height": 600
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 300,
+            "y": 0,
+            "width": 900,
+            "height": 600
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 300,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 600,
+            "y": 0,
+            "width": 0,
+            "height": 600
+          },
+          "segment": {
+            "from_x": 600,
+            "from_y": 0,
+            "to_x": 600,
+            "to_y": 600
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 300,
+                "y": 0,
+                "width": 300,
+                "height": 600
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 600,
+                "y": 0,
+                "width": 600,
+                "height": 600
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 600,
+            "y": 0,
+            "width": 600,
+            "height": 600
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 600,
+            "y": 0,
+            "width": 600,
+            "height": 600
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 300,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 900,
+            "y": 0,
+            "width": 0,
+            "height": 600
+          },
+          "segment": {
+            "from_x": 900,
+            "from_y": 0,
+            "to_x": 900,
+            "to_y": 600
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 600,
+                "y": 0,
+                "width": 300,
+                "height": 600
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 900,
+                "y": 0,
+                "width": 300,
+                "height": 600
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 2,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1200,
+          "height": 600
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 300,
+        "segment": {
+          "from_x": 300,
+          "from_y": 0,
+          "to_x": 300,
+          "to_y": 600
+        }
+      },
+      {
+        "operation_id": 4,
+        "sheet": 0,
+        "bounds": {
+          "x": 300,
+          "y": 0,
+          "width": 900,
+          "height": 600
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 300,
+        "segment": {
+          "from_x": 600,
+          "from_y": 0,
+          "to_x": 600,
+          "to_y": 600
+        }
+      },
+      {
+        "operation_id": 6,
+        "sheet": 0,
+        "bounds": {
+          "x": 600,
+          "y": 0,
+          "width": 600,
+          "height": 600
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 300,
+        "segment": {
+          "from_x": 900,
+          "from_y": 0,
+          "to_x": 900,
+          "to_y": 600
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 1,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "rip_fence",
+          "distance": 300
+        },
+        "initial": true
+      }
+    ]
+  },
+  "weighted_rotation": {
+    "counts": {
+      "cuts": 7,
+      "initial_setups": 1,
+      "setup_changes": 4,
+      "rotations": 3,
+      "handling": 7
+    },
+    "effort_score": 319,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 5
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 5,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 0,
+            "to_x": 5,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 18,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 10
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 0,
+            "to_x": 15,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 10,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 15,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 5,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 7,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 5,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 8,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 5,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 0,
+            "to_x": 13,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 10,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 11,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 8,
+            "width": 8,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 8,
+            "to_x": 13,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 8,
+                "width": 8,
+                "height": 11
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 13,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 14,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 12
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 15,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 12,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 7,
+            "to_x": 15,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 12
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 12
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 17,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 12
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 10
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 18,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 12
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 9,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 9,
+            "to_x": 15,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 2
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 9,
+                "width": 2,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 20,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 21,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 9,
+            "width": 5,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 9,
+            "to_x": 5,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 9,
+                "width": 5,
+                "height": 10
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 2,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 5,
+        "segment": {
+          "from_x": 5,
+          "from_y": 0,
+          "to_x": 5,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 5,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 18,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 10,
+        "segment": {
+          "from_x": 15,
+          "from_y": 0,
+          "to_x": 15,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 8,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 10,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 8,
+        "segment": {
+          "from_x": 13,
+          "from_y": 0,
+          "to_x": 13,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 11,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 8,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 8,
+          "to_x": 13,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 15,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 12,
+        "segment": {
+          "from_x": 13,
+          "from_y": 7,
+          "to_x": 15,
+          "to_y": 7
+        }
+      },
+      {
+        "operation_id": 18,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 7,
+          "width": 2,
+          "height": 12
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 13,
+          "from_y": 9,
+          "to_x": 15,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 21,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 5,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 0,
+          "from_y": 9,
+          "to_x": 5,
+          "to_y": 9
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 1,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 5
+        },
+        "initial": true
+      },
+      {
+        "id": 4,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 10
+        },
+        "initial": false
+      },
+      {
+        "id": 7,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      },
+      {
+        "id": 14,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 12
+        },
+        "initial": false
+      },
+      {
+        "id": 17,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 10
+        },
+        "initial": false
+      }
+    ]
+  },
+  "weighted_setups": {
+    "counts": {
+      "cuts": 6,
+      "initial_setups": 1,
+      "setup_changes": 2,
+      "rotations": 4,
+      "handling": 6
+    },
+    "effort_score": 217,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 10
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 9,
+            "width": 23,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 9,
+            "to_x": 23,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 23,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 9,
+                "width": 23,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 9
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 9
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 9
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 0,
+            "width": 0,
+            "height": 9
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 0,
+            "to_x": 13,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 13,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 10,
+                "height": 9
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 8,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 9,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 0,
+            "width": 0,
+            "height": 9
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 0,
+            "to_x": 5,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 9
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 11,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 0,
+            "width": 0,
+            "height": 9
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 0,
+            "to_x": 15,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 15,
+                "y": 0,
+                "width": 8,
+                "height": 9
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 13,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 14,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 8,
+            "width": 8,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 8,
+            "to_x": 13,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 8,
+                "width": 8,
+                "height": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 15,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 11,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 16,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 11,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 17,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 11,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 7
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 18,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 11,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 7,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 7,
+            "to_x": 15,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 2
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 3,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 0,
+          "from_y": 9,
+          "to_x": 23,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 6,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 9
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 10,
+        "segment": {
+          "from_x": 13,
+          "from_y": 0,
+          "to_x": 13,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 9,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 13,
+          "height": 9
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 0,
+          "to_x": 5,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 11,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 10,
+          "height": 9
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 8,
+        "segment": {
+          "from_x": 15,
+          "from_y": 0,
+          "to_x": 15,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 14,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 8,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 8,
+          "to_x": 13,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 18,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 7,
+        "segment": {
+          "from_x": 13,
+          "from_y": 7,
+          "to_x": 15,
+          "to_y": 7
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 2,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 10
+        },
+        "initial": true
+      },
+      {
+        "id": 8,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      },
+      {
+        "id": 17,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 7
+        },
+        "initial": false
+      }
+    ]
+  },
+  "cut_first": {
+    "counts": {
+      "cuts": 6,
+      "initial_setups": 1,
+      "setup_changes": 4,
+      "rotations": 3,
+      "handling": 6
+    },
+    "effort_score": 43,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 10
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 10,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 10,
+            "from_y": 0,
+            "to_x": 10,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 10,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 0,
+                "width": 13,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 7
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 7,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 7,
+            "width": 10,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 7,
+            "to_x": 10,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 10,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 7,
+                "width": 10,
+                "height": 12
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 13,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 8,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 13,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 7,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 17,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 17,
+            "from_y": 0,
+            "to_x": 17,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 0,
+                "width": 7,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 17,
+                "y": 0,
+                "width": 6,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 10,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 11,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 12,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 19
+          }
+        },
+        "depends_on": 8,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 10,
+            "y": 8,
+            "width": 7,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 10,
+            "from_y": 8,
+            "to_x": 17,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 0,
+                "width": 7,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 8,
+                "width": 7,
+                "height": 11
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 8,
+            "width": 7,
+            "height": 11
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 14,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 8,
+            "width": 7,
+            "height": 11
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 5
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 15,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 8,
+            "width": 7,
+            "height": 11
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 5,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 10,
+            "y": 13,
+            "width": 7,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 10,
+            "from_y": 13,
+            "to_x": 17,
+            "to_y": 13
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 8,
+                "width": 7,
+                "height": 5
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 13,
+                "width": 7,
+                "height": 6
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 7,
+            "height": 6
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 17,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 7,
+            "height": 6
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 0
+        }
+      },
+      {
+        "id": 18,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 7,
+            "height": 6
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 4
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 19,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 7,
+            "height": 6
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 4,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 14,
+            "y": 13,
+            "width": 0,
+            "height": 6
+          },
+          "segment": {
+            "from_x": 14,
+            "from_y": 13,
+            "to_x": 14,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 13,
+                "width": 4,
+                "height": 6
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 14,
+                "y": 13,
+                "width": 3,
+                "height": 6
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 2,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 10,
+        "segment": {
+          "from_x": 10,
+          "from_y": 0,
+          "to_x": 10,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 6,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 7,
+        "segment": {
+          "from_x": 0,
+          "from_y": 7,
+          "to_x": 10,
+          "to_y": 7
+        }
+      },
+      {
+        "operation_id": 8,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 0,
+          "width": 13,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 7,
+        "segment": {
+          "from_x": 17,
+          "from_y": 0,
+          "to_x": 17,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 12,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 0,
+          "width": 7,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 10,
+          "from_y": 8,
+          "to_x": 17,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 15,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 8,
+          "width": 7,
+          "height": 11
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 5,
+        "segment": {
+          "from_x": 10,
+          "from_y": 13,
+          "to_x": 17,
+          "to_y": 13
+        }
+      },
+      {
+        "operation_id": 19,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 13,
+          "width": 7,
+          "height": 6
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 4,
+        "segment": {
+          "from_x": 14,
+          "from_y": 13,
+          "to_x": 14,
+          "to_y": 19
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 1,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 10
+        },
+        "initial": true
+      },
+      {
+        "id": 5,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 7
+        },
+        "initial": false
+      },
+      {
+        "id": 11,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      },
+      {
+        "id": 14,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 5
+        },
+        "initial": false
+      },
+      {
+        "id": 18,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 4
+        },
+        "initial": false
+      }
+    ]
+  },
+  "setup_first": {
+    "counts": {
+      "cuts": 7,
+      "initial_setups": 1,
+      "setup_changes": 3,
+      "rotations": 5,
+      "handling": 7
+    },
+    "effort_score": 44,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 13
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 13,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 13,
+            "width": 23,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 13,
+            "to_x": 23,
+            "to_y": 13
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 23,
+                "height": 13
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 13,
+                "width": 23,
+                "height": 6
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 13
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 13
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 13
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 13,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 10,
+            "y": 0,
+            "width": 0,
+            "height": 13
+          },
+          "segment": {
+            "from_x": 10,
+            "from_y": 0,
+            "to_x": 10,
+            "to_y": 13
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 10,
+                "height": 13
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 0,
+                "width": 13,
+                "height": 13
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 13,
+            "width": 23,
+            "height": 6
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 8,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 13,
+            "width": 23,
+            "height": 6
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 9,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 13,
+            "width": 23,
+            "height": 6
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 13,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 10,
+            "y": 13,
+            "width": 0,
+            "height": 6
+          },
+          "segment": {
+            "from_x": 10,
+            "from_y": 13,
+            "to_x": 10,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 13,
+                "width": 10,
+                "height": 6
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 13,
+                "width": 13,
+                "height": 6
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 13,
+            "height": 13
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 11,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 13,
+            "height": 13
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 6
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 12,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 13,
+            "height": 13
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 6,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 17,
+            "y": 0,
+            "width": 0,
+            "height": 13
+          },
+          "segment": {
+            "from_x": 17,
+            "from_y": 0,
+            "to_x": 17,
+            "to_y": 13
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 0,
+                "width": 7,
+                "height": 13
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 17,
+                "y": 0,
+                "width": 6,
+                "height": 13
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 13
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 14,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 13
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 15,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 10,
+            "height": 13
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 6,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 7,
+            "width": 10,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 7,
+            "to_x": 10,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 10,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 7,
+                "width": 10,
+                "height": 6
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 13,
+            "height": 6
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 17,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 13,
+            "height": 6
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 9
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 18,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 13,
+            "width": 13,
+            "height": 6
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 9,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 14,
+            "y": 13,
+            "width": 0,
+            "height": 6
+          },
+          "segment": {
+            "from_x": 14,
+            "from_y": 13,
+            "to_x": 14,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 13,
+                "width": 4,
+                "height": 6
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 14,
+                "y": 13,
+                "width": 9,
+                "height": 6
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 13
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 20,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 13
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 21,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 13
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 22,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 10,
+            "y": 0,
+            "width": 7,
+            "height": 13
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 10,
+            "y": 8,
+            "width": 7,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 10,
+            "from_y": 8,
+            "to_x": 17,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 0,
+                "width": 7,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 10,
+                "y": 8,
+                "width": 7,
+                "height": 5
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 3,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 13,
+        "segment": {
+          "from_x": 0,
+          "from_y": 13,
+          "to_x": 23,
+          "to_y": 13
+        }
+      },
+      {
+        "operation_id": 6,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 13
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 13,
+        "segment": {
+          "from_x": 10,
+          "from_y": 0,
+          "to_x": 10,
+          "to_y": 13
+        }
+      },
+      {
+        "operation_id": 9,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 13,
+          "width": 23,
+          "height": 6
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 13,
+        "segment": {
+          "from_x": 10,
+          "from_y": 13,
+          "to_x": 10,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 12,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 0,
+          "width": 13,
+          "height": 13
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 6,
+        "segment": {
+          "from_x": 17,
+          "from_y": 0,
+          "to_x": 17,
+          "to_y": 13
+        }
+      },
+      {
+        "operation_id": 15,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 13
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 6,
+        "segment": {
+          "from_x": 0,
+          "from_y": 7,
+          "to_x": 10,
+          "to_y": 7
+        }
+      },
+      {
+        "operation_id": 18,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 13,
+          "width": 13,
+          "height": 6
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 9,
+        "segment": {
+          "from_x": 14,
+          "from_y": 13,
+          "to_x": 14,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 22,
+        "sheet": 0,
+        "bounds": {
+          "x": 10,
+          "y": 0,
+          "width": 7,
+          "height": 13
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 10,
+          "from_y": 8,
+          "to_x": 17,
+          "to_y": 8
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 2,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 13
+        },
+        "initial": true
+      },
+      {
+        "id": 11,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 6
+        },
+        "initial": false
+      },
+      {
+        "id": 17,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 9
+        },
+        "initial": false
+      },
+      {
+        "id": 21,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      }
+    ]
+  },
+  "sheets_sequential": {
+    "counts": {
+      "cuts": 15,
+      "initial_setups": 1,
+      "setup_changes": 5,
+      "rotations": 13,
+      "handling": 15
+    },
+    "effort_score": 86,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 10
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 0,
+            "to_x": 13,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 13,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 10,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 19
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 19
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 19
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 9,
+            "width": 13,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 9,
+            "to_x": 13,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 13,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 9,
+                "width": 13,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 8,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 9,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 3,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 9,
+            "width": 10,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 9,
+            "to_x": 23,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 10,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 9,
+                "width": 10,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 11,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 2
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 12,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 2,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 7,
+            "width": 10,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 7,
+            "to_x": 23,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 10,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 10,
+                "height": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 7
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 14,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 7
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 0
+        }
+      },
+      {
+        "id": 15,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 7
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 2,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 0,
+            "width": 0,
+            "height": 7
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 0,
+            "to_x": 15,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 15,
+                "y": 0,
+                "width": 8,
+                "height": 7
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 7,
+            "width": 10,
+            "height": 2
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 17,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 7,
+            "width": 10,
+            "height": 2
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 0
+        }
+      },
+      {
+        "id": 18,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 7,
+            "width": 10,
+            "height": 2
+          }
+        },
+        "depends_on": 12,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 2,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 7,
+            "width": 0,
+            "height": 2
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 7,
+            "to_x": 15,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 2
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 15,
+                "y": 7,
+                "width": 8,
+                "height": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 20,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 21,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 22,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 13,
+            "height": 9
+          }
+        },
+        "depends_on": 6,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 0,
+            "width": 0,
+            "height": 9
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 0,
+            "to_x": 5,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 9
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 23,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 22,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 24,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 22,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 25,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 22,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 8,
+            "width": 8,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 8,
+            "to_x": 13,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 8,
+                "width": 8,
+                "height": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 26,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 27,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 28,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 0,
+            "to_x": 15,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 15,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 15,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 29,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 15,
+            "height": 19
+          }
+        },
+        "depends_on": 28,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 30,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 15,
+            "height": 19
+          }
+        },
+        "depends_on": 28,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 10
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 31,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 15,
+            "height": 19
+          }
+        },
+        "depends_on": 28,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 0,
+            "to_x": 5,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 10,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 32,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 31,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 33,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 31,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 34,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 31,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 9,
+            "width": 5,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 9,
+            "to_x": 5,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 9,
+                "width": 5,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 35,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 31,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 36,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 31,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 1
+        }
+      },
+      {
+        "id": 37,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 31,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "bottom",
+          "setting": 10,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 9,
+            "width": 10,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 9,
+            "to_x": 15,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 10,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 9,
+                "width": 10,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 38,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 37,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 39,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 37,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 0
+        }
+      },
+      {
+        "id": 40,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 37,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 41,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 10,
+            "height": 9
+          }
+        },
+        "depends_on": 37,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 0,
+            "width": 0,
+            "height": 9
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 0,
+            "to_x": 13,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 9
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 42,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 43,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 44,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 8,
+            "width": 8,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 8,
+            "to_x": 13,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 8,
+                "width": 8,
+                "height": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 45,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 46,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 47,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 7
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 48,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 41,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 7,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 7,
+            "to_x": 15,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 2
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 3,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 10,
+        "segment": {
+          "from_x": 13,
+          "from_y": 0,
+          "to_x": 13,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 6,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 13,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 0,
+          "from_y": 9,
+          "to_x": 13,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 9,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 10,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 13,
+          "from_y": 9,
+          "to_x": 23,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 12,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 10,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 2,
+        "segment": {
+          "from_x": 13,
+          "from_y": 7,
+          "to_x": 23,
+          "to_y": 7
+        }
+      },
+      {
+        "operation_id": 15,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 10,
+          "height": 7
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 2,
+        "segment": {
+          "from_x": 15,
+          "from_y": 0,
+          "to_x": 15,
+          "to_y": 7
+        }
+      },
+      {
+        "operation_id": 18,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 7,
+          "width": 10,
+          "height": 2
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 2,
+        "segment": {
+          "from_x": 15,
+          "from_y": 7,
+          "to_x": 15,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 22,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 13,
+          "height": 9
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 0,
+          "to_x": 5,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 25,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 8,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 8,
+          "to_x": 13,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 28,
+        "sheet": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 8,
+        "segment": {
+          "from_x": 15,
+          "from_y": 0,
+          "to_x": 15,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 31,
+        "sheet": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 15,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 10,
+        "segment": {
+          "from_x": 5,
+          "from_y": 0,
+          "to_x": 5,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 34,
+        "sheet": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 5,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 0,
+          "from_y": 9,
+          "to_x": 5,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 37,
+        "sheet": 1,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 10,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "bottom",
+        "setting": 10,
+        "segment": {
+          "from_x": 5,
+          "from_y": 9,
+          "to_x": 15,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 41,
+        "sheet": 1,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 10,
+          "height": 9
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 8,
+        "segment": {
+          "from_x": 13,
+          "from_y": 0,
+          "to_x": 13,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 44,
+        "sheet": 1,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 8,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 8,
+          "to_x": 13,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 48,
+        "sheet": 1,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 7,
+        "segment": {
+          "from_x": 13,
+          "from_y": 7,
+          "to_x": 15,
+          "to_y": 7
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 2,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 10
+        },
+        "initial": true
+      },
+      {
+        "id": 11,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 2
+        },
+        "initial": false
+      },
+      {
+        "id": 21,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      },
+      {
+        "id": 30,
+        "sheet": 1,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 10
+        },
+        "initial": false
+      },
+      {
+        "id": 40,
+        "sheet": 1,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      },
+      {
+        "id": 47,
+        "sheet": 1,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 7
+        },
+        "initial": false
+      }
+    ]
+  },
+  "sheets_batched": {
+    "counts": {
+      "cuts": 14,
+      "initial_setups": 1,
+      "setup_changes": 3,
+      "rotations": 8,
+      "handling": 14
+    },
+    "effort_score": 64,
+    "operations": [
+      {
+        "id": 0,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 1,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 5
+          },
+          "initial": true
+        }
+      },
+      {
+        "id": 2,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 5,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 0,
+            "to_x": 5,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 18,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 4,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 23,
+            "height": 19
+          }
+        },
+        "depends_on": null,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 5,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 0,
+            "to_x": 5,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 18,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 6,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 8
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 7,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 0,
+            "to_x": 13,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 10,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 9,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 18,
+            "height": 19
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "left",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 0,
+            "to_x": 13,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 10,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 7,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 11,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 7,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 12,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 7,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 8,
+            "width": 8,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 8,
+            "to_x": 13,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 5,
+                "y": 8,
+                "width": 8,
+                "height": 11
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 7,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 14,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 7,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 15,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 7,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 0,
+            "to_x": 15,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 15,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 17,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 18,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 5,
+            "y": 0,
+            "width": 8,
+            "height": 19
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 5,
+            "y": 8,
+            "width": 8,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 5,
+            "from_y": 8,
+            "to_x": 13,
+            "to_y": 8
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 0,
+                "width": 8,
+                "height": 8
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 5,
+                "y": 8,
+                "width": 8,
+                "height": 11
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 20,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 2
+        }
+      },
+      {
+        "id": 21,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 10,
+            "height": 19
+          }
+        },
+        "depends_on": 9,
+        "action": {
+          "kind": "cut",
+          "axis": "vertical",
+          "reference_edge": "right",
+          "setting": 8,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 15,
+            "y": 0,
+            "width": 0,
+            "height": 19
+          },
+          "segment": {
+            "from_x": 15,
+            "from_y": 0,
+            "to_x": 15,
+            "to_y": 19
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 19
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 15,
+                "y": 0,
+                "width": 8,
+                "height": 19
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 22,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 23,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 24,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 9
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 25,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 2,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 9,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 9,
+            "width": 5,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 9,
+            "to_x": 5,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 0,
+                "y": 9,
+                "width": 5,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 26,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 27,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 28,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 15,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 9,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 9,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 9,
+            "to_x": 15,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 9,
+                "width": 2,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 29,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 30,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 31,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 19
+          }
+        },
+        "depends_on": 4,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 9,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 0,
+            "y": 9,
+            "width": 5,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 0,
+            "from_y": 9,
+            "to_x": 5,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 0,
+                "width": 5,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 0,
+                "y": 9,
+                "width": 5,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 32,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 21,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 33,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 21,
+        "action": {
+          "kind": "rotate",
+          "quarter_turns": 3
+        }
+      },
+      {
+        "id": 34,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 19
+          }
+        },
+        "depends_on": 21,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 9,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 9,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 9,
+            "to_x": 15,
+            "to_y": 9
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 9
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 9,
+                "width": 2,
+                "height": 10
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 35,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 28,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 36,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 28,
+        "action": {
+          "kind": "setup",
+          "setup": {
+            "kind": "panel_stop",
+            "distance": 7
+          },
+          "initial": false
+        }
+      },
+      {
+        "id": 37,
+        "workpiece": {
+          "sheet_index": 0,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 28,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 7,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 7,
+            "to_x": 15,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 0,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 38,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 34,
+        "action": {
+          "kind": "handle"
+        }
+      },
+      {
+        "id": 39,
+        "workpiece": {
+          "sheet_index": 1,
+          "bounds": {
+            "x": 13,
+            "y": 0,
+            "width": 2,
+            "height": 9
+          }
+        },
+        "depends_on": 34,
+        "action": {
+          "kind": "cut",
+          "axis": "horizontal",
+          "reference_edge": "top",
+          "setting": 7,
+          "kerf": 0,
+          "kerf_region": {
+            "x": 13,
+            "y": 7,
+            "width": 2,
+            "height": 0
+          },
+          "segment": {
+            "from_x": 13,
+            "from_y": 7,
+            "to_x": 15,
+            "to_y": 7
+          },
+          "children": [
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 0,
+                "width": 2,
+                "height": 7
+              }
+            },
+            {
+              "sheet_index": 1,
+              "bounds": {
+                "x": 13,
+                "y": 7,
+                "width": 2,
+                "height": 2
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "passes": [
+      {
+        "operation_id": 2,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 5,
+        "segment": {
+          "from_x": 5,
+          "from_y": 0,
+          "to_x": 5,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 4,
+        "sheet": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 23,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 5,
+        "segment": {
+          "from_x": 5,
+          "from_y": 0,
+          "to_x": 5,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 7,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 18,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 8,
+        "segment": {
+          "from_x": 13,
+          "from_y": 0,
+          "to_x": 13,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 9,
+        "sheet": 1,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 18,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "left",
+        "setting": 8,
+        "segment": {
+          "from_x": 13,
+          "from_y": 0,
+          "to_x": 13,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 12,
+        "sheet": 0,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 8,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 8,
+          "to_x": 13,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 15,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 10,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 8,
+        "segment": {
+          "from_x": 15,
+          "from_y": 0,
+          "to_x": 15,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 18,
+        "sheet": 1,
+        "bounds": {
+          "x": 5,
+          "y": 0,
+          "width": 8,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 8,
+        "segment": {
+          "from_x": 5,
+          "from_y": 8,
+          "to_x": 13,
+          "to_y": 8
+        }
+      },
+      {
+        "operation_id": 21,
+        "sheet": 1,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 10,
+          "height": 19
+        },
+        "axis": "vertical",
+        "edge": "right",
+        "setting": 8,
+        "segment": {
+          "from_x": 15,
+          "from_y": 0,
+          "to_x": 15,
+          "to_y": 19
+        }
+      },
+      {
+        "operation_id": 25,
+        "sheet": 0,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 5,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 9,
+        "segment": {
+          "from_x": 0,
+          "from_y": 9,
+          "to_x": 5,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 28,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 9,
+        "segment": {
+          "from_x": 13,
+          "from_y": 9,
+          "to_x": 15,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 31,
+        "sheet": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 5,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 9,
+        "segment": {
+          "from_x": 0,
+          "from_y": 9,
+          "to_x": 5,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 34,
+        "sheet": 1,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 19
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 9,
+        "segment": {
+          "from_x": 13,
+          "from_y": 9,
+          "to_x": 15,
+          "to_y": 9
+        }
+      },
+      {
+        "operation_id": 37,
+        "sheet": 0,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 7,
+        "segment": {
+          "from_x": 13,
+          "from_y": 7,
+          "to_x": 15,
+          "to_y": 7
+        }
+      },
+      {
+        "operation_id": 39,
+        "sheet": 1,
+        "bounds": {
+          "x": 13,
+          "y": 0,
+          "width": 2,
+          "height": 9
+        },
+        "axis": "horizontal",
+        "edge": "top",
+        "setting": 7,
+        "segment": {
+          "from_x": 13,
+          "from_y": 7,
+          "to_x": 15,
+          "to_y": 7
+        }
+      }
+    ],
+    "setups": [
+      {
+        "id": 1,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 5
+        },
+        "initial": true
+      },
+      {
+        "id": 6,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 8
+        },
+        "initial": false
+      },
+      {
+        "id": 24,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 9
+        },
+        "initial": false
+      },
+      {
+        "id": 36,
+        "sheet": 0,
+        "kind": "setup",
+        "setup": {
+          "kind": "panel_stop",
+          "distance": 7
+        },
+        "initial": false
+      }
+    ]
+  }
+}

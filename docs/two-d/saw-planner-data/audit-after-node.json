@@ -1,0 +1,718 @@
+{
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max"
+  },
+  "native": [
+    {
+      "parts": 4,
+      "sheets": 1,
+      "median_ms": 0.072,
+      "max_ms": 0.094,
+      "counts": {
+        "cuts": 3,
+        "initial_setups": 1,
+        "setup_changes": 0,
+        "rotations": 0,
+        "handling": 3
+      },
+      "effort_score": 11,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 3,
+        "explored_states": 84,
+        "budget_exhausted": false,
+        "beam_pruned": false,
+        "optimality": "optimal_within_candidate_model",
+        "baseline_effort_score": 11,
+        "baseline_counts": {
+          "cuts": 3,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 3
+        }
+      }
+    },
+    {
+      "parts": 32,
+      "sheets": 1,
+      "median_ms": 3.175,
+      "max_ms": 5.721,
+      "counts": {
+        "cuts": 31,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 11,
+        "handling": 31
+      },
+      "effort_score": 104,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 31,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 154,
+        "baseline_counts": {
+          "cuts": 31,
+          "initial_setups": 2,
+          "setup_changes": 12,
+          "rotations": 11,
+          "handling": 31
+        }
+      }
+    },
+    {
+      "parts": 64,
+      "sheets": 1,
+      "median_ms": 3.542,
+      "max_ms": 7.091,
+      "counts": {
+        "cuts": 63,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 11,
+        "handling": 63
+      },
+      "effort_score": 168,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 63,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 218,
+        "baseline_counts": {
+          "cuts": 63,
+          "initial_setups": 2,
+          "setup_changes": 12,
+          "rotations": 11,
+          "handling": 63
+        }
+      }
+    },
+    {
+      "parts": 128,
+      "sheets": 2,
+      "median_ms": 4.406,
+      "max_ms": 7.427,
+      "counts": {
+        "cuts": 126,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 22,
+        "handling": 126
+      },
+      "effort_score": 316,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 126,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 436,
+        "baseline_counts": {
+          "cuts": 126,
+          "initial_setups": 2,
+          "setup_changes": 26,
+          "rotations": 22,
+          "handling": 126
+        }
+      }
+    }
+  ],
+  "wasm_combined": [
+    {
+      "parts": 4,
+      "sheets": 1,
+      "median_ms": 0.111,
+      "max_ms": 0.122,
+      "counts": {
+        "cuts": 3,
+        "initial_setups": 1,
+        "setup_changes": 0,
+        "rotations": 0,
+        "handling": 3
+      },
+      "effort_score": 11,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 3,
+        "explored_states": 84,
+        "budget_exhausted": false,
+        "beam_pruned": false,
+        "optimality": "optimal_within_candidate_model",
+        "baseline_effort_score": 11,
+        "baseline_counts": {
+          "cuts": 3,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 3
+        }
+      }
+    },
+    {
+      "parts": 32,
+      "sheets": 1,
+      "median_ms": 2.192,
+      "max_ms": 2.498,
+      "counts": {
+        "cuts": 31,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 11,
+        "handling": 31
+      },
+      "effort_score": 104,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 31,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 154,
+        "baseline_counts": {
+          "cuts": 31,
+          "initial_setups": 2,
+          "setup_changes": 12,
+          "rotations": 11,
+          "handling": 31
+        }
+      }
+    },
+    {
+      "parts": 64,
+      "sheets": 1,
+      "median_ms": 2.383,
+      "max_ms": 4.708,
+      "counts": {
+        "cuts": 63,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 11,
+        "handling": 63
+      },
+      "effort_score": 168,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 63,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 218,
+        "baseline_counts": {
+          "cuts": 63,
+          "initial_setups": 2,
+          "setup_changes": 12,
+          "rotations": 11,
+          "handling": 63
+        }
+      }
+    },
+    {
+      "parts": 128,
+      "sheets": 2,
+      "median_ms": 2.327,
+      "max_ms": 2.458,
+      "counts": {
+        "cuts": 126,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 22,
+        "handling": 126
+      },
+      "effort_score": 316,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 126,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 436,
+        "baseline_counts": {
+          "cuts": 126,
+          "initial_setups": 2,
+          "setup_changes": 26,
+          "rotations": 22,
+          "handling": 126
+        }
+      }
+    }
+  ],
+  "wasm_two_d": [
+    {
+      "parts": 4,
+      "sheets": 1,
+      "median_ms": 0.102,
+      "max_ms": 0.118,
+      "counts": {
+        "cuts": 3,
+        "initial_setups": 1,
+        "setup_changes": 0,
+        "rotations": 0,
+        "handling": 3
+      },
+      "effort_score": 11,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 3,
+        "explored_states": 84,
+        "budget_exhausted": false,
+        "beam_pruned": false,
+        "optimality": "optimal_within_candidate_model",
+        "baseline_effort_score": 11,
+        "baseline_counts": {
+          "cuts": 3,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 3
+        }
+      }
+    },
+    {
+      "parts": 32,
+      "sheets": 1,
+      "median_ms": 2.327,
+      "max_ms": 2.535,
+      "counts": {
+        "cuts": 31,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 11,
+        "handling": 31
+      },
+      "effort_score": 104,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 31,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 154,
+        "baseline_counts": {
+          "cuts": 31,
+          "initial_setups": 2,
+          "setup_changes": 12,
+          "rotations": 11,
+          "handling": 31
+        }
+      }
+    },
+    {
+      "parts": 64,
+      "sheets": 1,
+      "median_ms": 2.338,
+      "max_ms": 2.766,
+      "counts": {
+        "cuts": 63,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 11,
+        "handling": 63
+      },
+      "effort_score": 168,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 63,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 218,
+        "baseline_counts": {
+          "cuts": 63,
+          "initial_setups": 2,
+          "setup_changes": 12,
+          "rotations": 11,
+          "handling": 63
+        }
+      }
+    },
+    {
+      "parts": 128,
+      "sheets": 2,
+      "median_ms": 2.295,
+      "max_ms": 4.945,
+      "counts": {
+        "cuts": 126,
+        "initial_setups": 2,
+        "setup_changes": 2,
+        "rotations": 22,
+        "handling": 126
+      },
+      "effort_score": 316,
+      "search": {
+        "limits": {
+          "max_states": 4000,
+          "beam_width": 32,
+          "baseline_max_states": 20000
+        },
+        "baseline_states": 126,
+        "explored_states": 4000,
+        "budget_exhausted": true,
+        "beam_pruned": true,
+        "optimality": "heuristic",
+        "baseline_effort_score": 436,
+        "baseline_counts": {
+          "cuts": 126,
+          "initial_setups": 2,
+          "setup_changes": 26,
+          "rotations": 22,
+          "handling": 126
+        }
+      }
+    }
+  ],
+  "strips": {
+    "native": [
+      {
+        "parts": 128,
+        "median_ms": 1.557,
+        "max_ms": 1.738,
+        "counts": {
+          "cuts": 127,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 127
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 127,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 259,
+          "baseline_counts": {
+            "cuts": 127,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 127
+          }
+        }
+      },
+      {
+        "parts": 256,
+        "median_ms": 4.336,
+        "max_ms": 4.459,
+        "counts": {
+          "cuts": 255,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 255
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 255,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 515,
+          "baseline_counts": {
+            "cuts": 255,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 255
+          }
+        }
+      },
+      {
+        "parts": 512,
+        "median_ms": 15.934,
+        "max_ms": 16.312,
+        "counts": {
+          "cuts": 511,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 511
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 511,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 1027,
+          "baseline_counts": {
+            "cuts": 511,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 511
+          }
+        }
+      }
+    ],
+    "wasm_combined": [
+      {
+        "parts": 128,
+        "median_ms": 2.075,
+        "max_ms": 5.714,
+        "counts": {
+          "cuts": 127,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 127
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 127,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 259,
+          "baseline_counts": {
+            "cuts": 127,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 127
+          }
+        }
+      },
+      {
+        "parts": 256,
+        "median_ms": 7.636,
+        "max_ms": 13.478,
+        "counts": {
+          "cuts": 255,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 255
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 255,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 515,
+          "baseline_counts": {
+            "cuts": 255,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 255
+          }
+        }
+      },
+      {
+        "parts": 512,
+        "median_ms": 29.51,
+        "max_ms": 42.158,
+        "counts": {
+          "cuts": 511,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 511
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 511,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 1027,
+          "baseline_counts": {
+            "cuts": 511,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 511
+          }
+        }
+      }
+    ],
+    "wasm_two_d": [
+      {
+        "parts": 128,
+        "median_ms": 1.624,
+        "max_ms": 1.819,
+        "counts": {
+          "cuts": 127,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 127
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 127,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 259,
+          "baseline_counts": {
+            "cuts": 127,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 127
+          }
+        }
+      },
+      {
+        "parts": 256,
+        "median_ms": 4.546,
+        "max_ms": 4.616,
+        "counts": {
+          "cuts": 255,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 255
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 255,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 515,
+          "baseline_counts": {
+            "cuts": 255,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 255
+          }
+        }
+      },
+      {
+        "parts": 512,
+        "median_ms": 14.762,
+        "max_ms": 18.7,
+        "counts": {
+          "cuts": 511,
+          "initial_setups": 1,
+          "setup_changes": 0,
+          "rotations": 0,
+          "handling": 511
+        },
+        "search": {
+          "limits": {
+            "max_states": 0,
+            "beam_width": 32,
+            "baseline_max_states": 20000
+          },
+          "baseline_states": 511,
+          "explored_states": 0,
+          "budget_exhausted": true,
+          "beam_pruned": false,
+          "optimality": "heuristic",
+          "baseline_effort_score": 1027,
+          "baseline_counts": {
+            "cuts": 511,
+            "initial_setups": 1,
+            "setup_changes": 0,
+            "rotations": 0,
+            "handling": 511
+          }
+        }
+      }
+    ]
+  }
+}

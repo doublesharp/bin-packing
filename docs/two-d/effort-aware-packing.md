@@ -1,0 +1,13 @@
+# Follow-up: effort-aware packing under a material budget
+
+The new planner optimizes existing placements. It cannot recover useful layouts discarded by `TwoDSolution::is_better_than` or an internal beam comparator. Changing app-level ranking alone therefore cannot implement an easier-to-cut packing objective.
+
+A future opt-in solve API should accept both an effort model and explicit material constraints. Require a maximum consumed sheet count and either per-stock caps or a maximum material price. A default budget can be the material-oriented incumbent's sheet count and price, with no extra stock allowed. Any relaxation must be explicit in the request and result. Keep inventory caps hard. Compare material price using the same validated price representation as the solver; do not mix it with effort units.
+
+Inside each packing pass, retain a bounded set of distinct feasible candidates within the material budget. A Pareto set should distinguish unplaced demand, stock-instance usage, material cost, waste/drop metrics and a cheap effort lower bound. Maintain diversity in repeated dimensions, compatible split directions and cut-tree structure, rather than discarding every candidate with a slightly worse waste tie-breaker. Guillotine construction should retain its actual split tree, blade context and source stock/demand indices, avoiding later provenance reconstruction.
+
+Only fully placed, physically replayable candidates qualify for final effort ranking. Run the saw planner on shortlisted layouts under the same machine, weights and search limits. Rank by the requested shop objective within the material caps, then material cost/waste, then a deterministic seed/candidate order. Record all effective caps, source indices, material delta from the ordinary solver, packing-search truncation and schedule-search truncation separately. Keep the ordinary material solution as a fallback incumbent.
+
+The first implementation should target guillotine construction and its multistart candidate pool. MaxRects and skyline candidates need physical saw validation before admission. Do not extend CNC or 1D/3D comparators implicitly. Allocation limits should independently cap packing states, Pareto candidates and cumulative planning work so a small per-plan budget cannot multiply into unbounded total effort.
+
+Acceptance requires a fixture where two layouts survive a material tie but differ in executable setup effort; one where easier cutting needs an extra sheet and is rejected by the default budget; one where explicit budget relaxation admits that layout; heterogeneous stock prices/inventory; deterministic budget exhaustion; and independent physical replay of every reported winner. Report the best candidate found, not a global packing optimum.

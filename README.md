@@ -855,12 +855,27 @@ AGENTS.md                    # contributor rules
 
 ## Verification
 
-Core Rust checks (matches CI gate described in [AGENTS.md](AGENTS.md)):
+One-time install for the repo-wide hygiene tools:
 
 ```sh
-cargo fmt --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-targets
+cargo install taplo-cli typos-cli --locked
+```
+
+Full Rust/doc/text/TOML quality gate (matches CI):
+
+```sh
+./scripts/check-quality.sh
+```
+
+Equivalent individual commands:
+
+```sh
+cargo fmt --all --check
+taplo fmt --check .
+typos
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-targets --all-features --locked
+cargo doc --manifest-path crates/bin-packing/Cargo.toml --locked --no-deps --document-private-items
 ```
 
 Criterion benchmarks:
@@ -890,3 +905,10 @@ Fuzz target build and execution:
 cargo check --manifest-path fuzz/Cargo.toml
 cargo fuzz run solver_inputs
 ```
+
+### Complete workspace and package verification
+
+See [workspace verification](docs/workspace-verification.md) for the feature matrix,
+all binding entry points, isolated npm archive checks, browser/type checks and the
+seeded counterexample finder. `scripts/check-bindings.sh` rebuilds and checks both
+packages; `scripts/check-features.sh` includes the separate fuzz project.

@@ -356,3 +356,10 @@ pnpm test
 ## License
 
 MIT.
+
+### Workpiece-aware saw jobs
+
+`plan2dSawCuts(job, options?)` is available in combined and `two-d` builds for every
+target. It accepts explicit stock/demand provenance and returns one authoritative
+physical schedule. See [the API and migration guide](../../docs/two-d/saw-planner.md).
+After building, run `node ../../examples/saw-planner.mjs wasm` or use `two-d`.
