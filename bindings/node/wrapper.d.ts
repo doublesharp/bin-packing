@@ -342,3 +342,107 @@ export declare function plan2dCuts(solution: TwoDSolution, options?: CutPlanOpti
 export declare function plan1d_cuts(problem: OneDProblem, solution: OneDSolution, options?: CutPlanOptions1D): CutPlanSolution1D
 export declare function plan2d_cuts(solution: TwoDSolution, options?: CutPlanOptions2D): CutPlanSolution2D
 export declare function version(): string
+
+// Workpiece-aware saw planner, schema version 1.
+/** Geometry only; packing-result layouts are structurally compatible. */
+export interface SawLayout2D {
+  width: number;
+  height: number;
+  placements: Placement2D[];
+}
+/** Explicit source indices are required; names are labels, never identity keys. */
+export interface SawJob2D {
+  problem: TwoDProblem;
+  layouts: SawLayout2D[];
+  stock_indices: number[];
+  demand_indices: number[][];
+}
+export type SawAxis2D = 'vertical' | 'horizontal';
+export type ReferenceEdge2D = 'left' | 'top' | 'right' | 'bottom';
+export type SawMachine2D = 'table_saw' | 'panel_saw';
+export type SawSetupKind2D = 'rip_fence' | 'crosscut_stop' | 'panel_stop';
+export type SawObjective2D = 'fewest_setup_changes' | 'fewest_cuts' | 'weighted_effort';
+export interface SawSetup2D { kind: SawSetupKind2D; distance: number }
+/** Effort units, not time or material price. All weights must be finite, 0 through 1e100. */
+export interface SawWeights2D {
+  cut: number;
+  initial_setup: number;
+  setup_change: number;
+  rotation: number;
+  handling: number;
+}
+export interface SawSearchLimits2D {
+  max_states: number;
+  beam_width: number;
+  baseline_max_states: number;
+}
+export interface SawPlanOptions2D {
+  machine?: SawMachine2D;
+  objective?: SawObjective2D;
+  weights?: Partial<SawWeights2D>;
+  batch_across_sheets?: boolean;
+  search?: Partial<SawSearchLimits2D>;
+  min_usable_side?: number;
+}
+export interface SawRect2D { x: number; y: number; width: number; height: number }
+export interface WorkpieceId2D { sheet_index: number; bounds: SawRect2D }
+export interface PartId2D { sheet_index: number; placement_index: number }
+export interface SawWorkpiece2D {
+  id: WorkpieceId2D;
+  parent: WorkpieceId2D | null;
+  created_by: number | null;
+  finished_part: PartId2D | null;
+  usable_offcut: boolean;
+}
+export interface SawSegment2D { from_x: number; from_y: number; to_x: number; to_y: number }
+export type SawAction2D =
+  | { kind: 'handle' }
+  | { kind: 'rotate'; quarter_turns: number }
+  | { kind: 'setup'; setup: SawSetup2D; initial: boolean }
+  | { kind: 'cut'; axis: SawAxis2D; reference_edge: ReferenceEdge2D; setting: number;
+      kerf: number; kerf_region: SawRect2D; segment: SawSegment2D; children: WorkpieceId2D[] };
+export interface SawOperation2D {
+  id: number;
+  workpiece: WorkpieceId2D;
+  depends_on: number | null;
+  action: SawAction2D;
+}
+export interface SawCounts2D {
+  cuts: number;
+  initial_setups: number;
+  setup_changes: number;
+  rotations: number;
+  handling: number;
+}
+export type SawOptimality2D = 'heuristic' | 'optimal_within_candidate_model';
+export interface SawSearchReport2D {
+  limits: SawSearchLimits2D;
+  baseline_states: number;
+  explored_states: number;
+  budget_exhausted: boolean;
+  beam_pruned: boolean;
+  optimality: SawOptimality2D;
+  baseline_effort_score: number;
+  baseline_counts: SawCounts2D;
+}
+/** Diagram references, not an independently executable per-sheet plan. */
+export interface SawSheetView2D {
+  sheet_index_in_solution: number;
+  stock_index: number;
+  operation_ids: number[];
+}
+export interface SawPlan2D {
+  schema_version: number;
+  machine: SawMachine2D;
+  objective: SawObjective2D;
+  batch_across_sheets: boolean;
+  operations: SawOperation2D[];
+  workpieces: SawWorkpiece2D[];
+  sheet_views: SawSheetView2D[];
+  counts: SawCounts2D;
+  effective_weights: SawWeights2D;
+  effort_score: number;
+  search: SawSearchReport2D;
+}
+/** Plan a physical saw job. Execute operations in order; sheet views are diagram references. */
+export function plan2dSawCuts(job: SawJob2D, options?: SawPlanOptions2D | null): SawPlan2D;

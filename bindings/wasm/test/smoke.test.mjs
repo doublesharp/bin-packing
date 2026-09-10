@@ -241,3 +241,15 @@ test('solve3dJson accepts and returns JSON strings', () => {
   const parsed = JSON.parse(result);
   assert.ok(parsed.bin_count >= 1);
 });
+
+for (const [name, api] of [['combined', wasm], ['two-d', wasmTwoD]]) {
+  test(`${name} workpiece-aware saw planner contract and physical settings`, () => {
+    require('../../saw-plan-smoke.cjs').smoke(api);
+  });
+}
+
+for (const [name, api] of [['combined', wasm], ['two-d', wasmTwoD]]) {
+  test(`${name} consumer replay rejects corrupted saw output`, () => {
+    require('../../saw-plan-smoke.cjs').mutationSmoke(api);
+  });
+}

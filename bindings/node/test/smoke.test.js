@@ -93,6 +93,14 @@ test('plan2dCuts generates a cut plan for a 2D solution', () => {
   assert.equal(plan.preset, 'table_saw', 'default preset should be table_saw');
 });
 
+test('workpiece-aware saw planner contract and physical settings', () => {
+  require('../../saw-plan-smoke.cjs').smoke(binPacking);
+});
+
+test('consumer replay rejects corrupted saw output', () => {
+  require('../../saw-plan-smoke.cjs').mutationSmoke(binPacking);
+});
+
 test('consumer package contract includes large solve-to-cut roundtrips', () => {
   require('../../test/package-contract.cjs').packageContract(require('..'));
 });

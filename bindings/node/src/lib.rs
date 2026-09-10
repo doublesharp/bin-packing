@@ -75,6 +75,21 @@ pub fn plan2d_cuts(solution_json: String, options_json: Option<String>) -> napi:
     serde_json::to_string(&cut_plan).map_err(to_napi_error)
 }
 
+/// Plan a workpiece-aware physical saw schedule from JSON with explicit provenance.
+#[napi]
+#[cfg(feature = "two-d")]
+pub fn plan2d_saw_cuts(job_json: String, options_json: Option<String>) -> napi::Result<String> {
+    use bin_packing::two_d::saw_plan::{SawJob2D, SawPlanOptions2D, plan_saw_cuts};
+    let job = parse_json::<SawJob2D>(&job_json)?;
+    let options = options_json
+        .as_deref()
+        .map(parse_json::<SawPlanOptions2D>)
+        .transpose()?
+        .unwrap_or_default();
+    let plan = plan_saw_cuts(&job, &options).map_err(to_napi_error)?;
+    serde_json::to_string(&plan).map_err(to_napi_error)
+}
+
 #[napi]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()

@@ -27,7 +27,13 @@ function plan2dCuts(solution, options) {
   return JSON.parse(native.plan2DCuts(JSON.stringify(solution), options != null ? JSON.stringify(options) : undefined));
 }
 
+function plan2dSawCuts(job, options) {
+  if (!native.plan2DSawCuts) throw new Error('plan2dSawCuts is not available in this build (missing two-d feature)');
+  return JSON.parse(native.plan2DSawCuts(JSON.stringify(job), options != null ? JSON.stringify(options) : undefined));
+}
+
 module.exports = {
+  plan2dSawCuts,
   solve1d,
   solve2d,
   solve3d,

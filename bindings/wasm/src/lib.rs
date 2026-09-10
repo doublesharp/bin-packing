@@ -128,6 +128,17 @@ pub fn plan_2d_cuts_js(solution: JsValue, options: JsValue) -> Result<JsValue, J
     to_js_value(&cut_plan)
 }
 
+/// Plan an authoritative workpiece-aware saw job with explicit source indices.
+#[cfg(feature = "two-d")]
+#[wasm_bindgen(js_name = plan2dSawCuts)]
+pub fn plan_2d_saw_cuts_js(job: JsValue, options: JsValue) -> Result<JsValue, JsError> {
+    use bin_packing::two_d::saw_plan::{SawJob2D, SawPlanOptions2D, plan_saw_cuts};
+    let job = from_js_value::<SawJob2D>(job, "job")?;
+    let options = options_from_js::<SawPlanOptions2D>(options)?;
+    let plan = plan_saw_cuts(&job, &options).map_err(to_js_error)?;
+    to_js_value(&plan)
+}
+
 /// Return the crate version string.
 #[wasm_bindgen]
 pub fn version() -> String {
