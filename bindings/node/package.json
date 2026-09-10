@@ -40,12 +40,12 @@
   },
   "scripts": {
     "artifacts": "napi artifacts --output-dir artifacts",
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "node ../../scripts/package-command.cjs napi build --platform --release",
+    "build:debug": "node ../../scripts/package-command.cjs napi build --platform",
     "create:npm-dirs": "napi create-npm-dirs",
     "prepublish:native": "napi pre-publish --tag-style npm",
-    "test": "node --test test/smoke.test.js ../test/finder.test.cjs",
-    "test:package": "node ../test/package-native.cjs"
+    "test": "node ../../scripts/package-command.cjs node --test test/smoke.test.js ../test/finder.test.cjs",
+    "test:package": "node ../../scripts/package-command.cjs node ../test/package-native.cjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.6.1"

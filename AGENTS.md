@@ -38,7 +38,7 @@ Rules for contributing to this Rust bin-packing workspace. Keep the crate publis
 - Workspace clippy lints are `deny`: `unwrap_used`, `dbg_macro`, `todo`. Treat `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` as the gate.
 - Repo-wide text and metadata hygiene is enforced with `typos` (`typos.toml`) and `taplo` (`.taplo.toml`).
 - `#![deny(rustdoc::broken_intra_doc_links)]` is set on the main crate. Run `cargo doc --manifest-path crates/bin-packing/Cargo.toml --no-deps --document-private-items` to surface broken doc links.
-- When `.scratch.json` exists, use the check scripts or `python3 scripts/scratch.py run <command>` for disposable work. Edit sources and lockfiles only in the original checkout. See `docs/scratch-builds.md`.
+- When `.scratch.json` exists, Cargo, check scripts, and npm build/test/clean scripts use the saved build location automatically. Use `python3 scripts/scratch.py run <command>` for other disposable work. Edit sources and lockfiles only in the original checkout. See `docs/scratch-builds.md`.
 - Prefer `./scripts/check-quality.sh` for the full local gate; it runs `cargo fmt`, `taplo`, `typos`, `cargo clippy`, `cargo test`, and `cargo doc`.
 - Before claiming work is complete: `./scripts/check-quality.sh`.
 - MSRV is declared in `[workspace.package]`. Don't use features newer than that without bumping it.

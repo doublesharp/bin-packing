@@ -106,12 +106,12 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "build:bundler": "node scripts/build.mjs --target bundler",
-    "build:web": "node scripts/build.mjs --target web",
-    "build:nodejs": "node scripts/build.mjs --target nodejs",
-    "clean": "node -e \"import('node:fs').then(fs => fs.promises.rm('dist', { recursive: true, force: true }))\"",
-    "test": "node --experimental-wasm-modules --test test/*.test.mjs",
+    "build": "node ../../scripts/package-command.cjs node scripts/build.mjs",
+    "build:bundler": "node ../../scripts/package-command.cjs node scripts/build.mjs --target bundler",
+    "build:web": "node ../../scripts/package-command.cjs node scripts/build.mjs --target web",
+    "build:nodejs": "node ../../scripts/package-command.cjs node scripts/build.mjs --target nodejs",
+    "clean": "node ../../scripts/package-command.cjs node -e \"import('node:fs').then(fs => fs.promises.rm('dist', { recursive: true, force: true }))\"",
+    "test": "node ../../scripts/package-command.cjs node --experimental-wasm-modules --test test/*.test.mjs",
     "prepack": "node scripts/build.mjs"
   }
 }

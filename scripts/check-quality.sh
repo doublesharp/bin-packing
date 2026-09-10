@@ -32,6 +32,7 @@ require_cmd cargo
 require_cmd taplo
 require_cmd typos
 require_cmd python3
+require_cmd node
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests
 cargo fmt --all --check
