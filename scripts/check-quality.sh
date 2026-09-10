@@ -23,10 +23,17 @@ require_cmd() {
 
 cd "${repo_root}"
 
+# Local opt-in; CI and unconfigured checkouts use the normal workspace.
+if [[ -f .scratch.json && ${BIN_PACKING_SCRATCH_ACTIVE:-} != 1 ]]; then
+  exec python3 scripts/scratch.py run ./scripts/check-quality.sh "$@"
+fi
+
 require_cmd cargo
 require_cmd taplo
 require_cmd typos
+require_cmd python3
 
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests
 cargo fmt --all --check
 taplo fmt --check .
 typos

@@ -3,12 +3,17 @@
 set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "${script_dir}/.."
+# Local opt-in; CI and unconfigured checkouts use the normal workspace.
+if [[ -f .scratch.json && ${BIN_PACKING_SCRATCH_ACTIVE:-} != 1 ]]; then
+  exec python3 scripts/scratch.py run ./scripts/check-bindings.sh "$@"
+fi
+
 if [[ $# -gt 1 || (${1:-} != '' && ${1:-} != '--skip-build') ]]; then
   printf 'Usage: scripts/check-bindings.sh [--skip-build]\n' >&2
   exit 2
 fi
 if [[ ${1:-} != '--skip-build' ]]; then
-  pnpm --dir bindings/node install --frozen-lockfile
+  (cd bindings/node && pnpm install --frozen-lockfile)
   npm --prefix bindings/node run build
   npm --prefix bindings/wasm run build
 fi

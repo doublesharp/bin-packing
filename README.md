@@ -912,3 +912,5 @@ See [workspace verification](docs/workspace-verification.md) for the feature mat
 all binding entry points, isolated npm archive checks, browser/type checks and the
 seeded counterexample finder. `scripts/check-bindings.sh` rebuilds and checks both
 packages; `scripts/check-features.sh` includes the separate fuzz project.
+
+For local builds on a separate disposable volume, see [Scratch build storage](docs/scratch-builds.md).

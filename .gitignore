@@ -20,3 +20,8 @@ tmpnpminstall/
 *.so
 *.dll
 npm-debug.log*
+
+# Machine-local disposable build storage
+/.scratch.json
+/.cargo/config.toml
+**/__pycache__/

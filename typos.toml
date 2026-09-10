@@ -8,4 +8,13 @@ extend-exclude = [
   "bindings/wasm/pnpm-lock.yaml",
   "docs/*.png",
   "target/",
+  "**/node_modules/",
+  "bindings/wasm/dist/",
+  "bindings/node/npm/",
+  "bindings/node/index.js",
+  "bindings/node/index.d.ts",
+  "fuzz/target/",
+  "fuzz/artifacts/",
+  "fuzz/corpus/",
+  "fuzz/coverage/",
 ]
