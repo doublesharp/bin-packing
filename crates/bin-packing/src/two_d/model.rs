@@ -368,6 +368,11 @@ pub(crate) fn projected_fresh_sheet_fit_count(
 
 const MAX_DIMENSION: u32 = 1 << 30;
 
+/// Maximum allowed per-demand quantity and total expanded item count. Keeps the
+/// total piece count within `usize` on 32-bit targets (e.g. `wasm32`) and
+/// guards the `width * height * quantity` area widening.
+const MAX_QUANTITY: usize = u32::MAX as usize;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Rect {
     pub(crate) x: u32,
@@ -450,7 +455,26 @@ impl TwoDProblem {
                     demand.name
                 )));
             }
+
+            if demand.quantity > MAX_QUANTITY {
+                return Err(BinPackingError::InvalidInput(format!(
+                    "demand `{}` quantity {} exceeds the supported maximum of {MAX_QUANTITY}",
+                    demand.name, demand.quantity
+                )));
+            }
         }
+
+        // Bound the total expanded item count so the per-piece expansion cannot
+        // overflow `usize` (which is 32-bit on `wasm32`).
+        self.demands
+            .iter()
+            .try_fold(0usize, |acc, demand| acc.checked_add(demand.quantity))
+            .filter(|total| *total <= MAX_QUANTITY)
+            .ok_or_else(|| {
+                BinPackingError::InvalidInput(format!(
+                    "total demand quantity exceeds the supported maximum of {MAX_QUANTITY}"
+                ))
+            })?;
 
         Ok(())
     }

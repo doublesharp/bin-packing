@@ -16,6 +16,10 @@ pub const MAX_DIMENSION_3D: u32 = 1 << 15;
 /// produce more bins than this should abort with `InvalidInput`.
 pub const MAX_BIN_COUNT_3D: usize = 1 << 15;
 
+/// Maximum allowed per-demand quantity and total expanded item count. Keeps the
+/// total piece count within `usize` on 32-bit targets (e.g. `wasm32`).
+const MAX_QUANTITY: usize = u32::MAX as usize;
+
 /// Algorithm selector for [`solve_3d`](super::solve_3d).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -593,6 +597,12 @@ impl ThreeDProblem {
                     demand.name
                 )));
             }
+            if demand.quantity > MAX_QUANTITY {
+                return Err(BinPackingError::InvalidInput(format!(
+                    "demand `{}` quantity {} exceeds the supported maximum of {MAX_QUANTITY}",
+                    demand.name, demand.quantity
+                )));
+            }
             if demand.allowed_rotations.is_empty() {
                 return Err(BinPackingError::InvalidInput(format!(
                     "demand `{}` must allow at least one rotation",
@@ -600,6 +610,18 @@ impl ThreeDProblem {
                 )));
             }
         }
+
+        // Bound the total expanded item count so the per-piece expansion cannot
+        // overflow `usize` (which is 32-bit on `wasm32`).
+        self.demands
+            .iter()
+            .try_fold(0usize, |acc, demand| acc.checked_add(demand.quantity))
+            .filter(|total| *total <= MAX_QUANTITY)
+            .ok_or_else(|| {
+                BinPackingError::InvalidInput(format!(
+                    "total demand quantity exceeds the supported maximum of {MAX_QUANTITY}"
+                ))
+            })?;
 
         Ok(())
     }

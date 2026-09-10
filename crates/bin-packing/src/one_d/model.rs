@@ -11,6 +11,11 @@ use crate::{BinPackingError, Result};
 /// `usize`) cannot overflow a `u64`. Matches the 2D model's `MAX_DIMENSION`.
 const MAX_DIMENSION: u32 = 1 << 30;
 
+/// Maximum allowed per-demand quantity and total expanded piece count. Enforces
+/// the `u32`-bound `usize` invariant the lengths above rely on, and keeps the
+/// total piece count within `usize` on 32-bit targets (e.g. `wasm32`).
+const MAX_QUANTITY: usize = u32::MAX as usize;
+
 /// Algorithm selector for [`solve_1d`](super::solve_1d).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -314,7 +319,27 @@ impl OneDProblem {
                     demand.name
                 )));
             }
+
+            if demand.quantity > MAX_QUANTITY {
+                return Err(BinPackingError::InvalidInput(format!(
+                    "demand `{}` quantity {} exceeds the supported maximum of {MAX_QUANTITY}",
+                    demand.name, demand.quantity
+                )));
+            }
         }
+
+        // Bound the total expanded piece count so neither the exact backend's
+        // `count * length` widening nor the per-piece expansion can overflow
+        // `usize` (which is 32-bit on `wasm32`).
+        self.demands
+            .iter()
+            .try_fold(0usize, |acc, demand| acc.checked_add(demand.quantity))
+            .filter(|total| *total <= MAX_QUANTITY)
+            .ok_or_else(|| {
+                BinPackingError::InvalidInput(format!(
+                    "total demand quantity exceeds the supported maximum of {MAX_QUANTITY}"
+                ))
+            })?;
 
         Ok(())
     }
@@ -690,6 +715,47 @@ mod tests {
             zero_quantity_demand.validate(),
             Err(BinPackingError::InvalidInput(message))
                 if message == "demand `cut` must have a positive quantity"
+        ));
+    }
+
+    #[test]
+    fn validation_rejects_quantity_above_max() {
+        let bar = Stock1D {
+            name: "bar".to_string(),
+            length: 5,
+            kerf: 0,
+            trim: 0,
+            cost: 1.0,
+            available: None,
+        };
+
+        // A single demand whose quantity exceeds the per-demand cap.
+        let oversized = OneDProblem {
+            stock: vec![bar.clone()],
+            demands: vec![CutDemand1D {
+                name: "cut".to_string(),
+                length: 1,
+                quantity: MAX_QUANTITY + 1,
+            }],
+        };
+        assert!(matches!(
+            oversized.validate(),
+            Err(BinPackingError::InvalidInput(message))
+                if message.contains("exceeds the supported maximum")
+        ));
+
+        // Two in-range demands whose sum overflows the total cap.
+        let oversized_total = OneDProblem {
+            stock: vec![bar],
+            demands: vec![
+                CutDemand1D { name: "a".to_string(), length: 1, quantity: MAX_QUANTITY },
+                CutDemand1D { name: "b".to_string(), length: 1, quantity: 1 },
+            ],
+        };
+        assert!(matches!(
+            oversized_total.validate(),
+            Err(BinPackingError::InvalidInput(message))
+                if message == "total demand quantity exceeds the supported maximum of 4294967295"
         ));
     }
 
