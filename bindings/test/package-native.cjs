@@ -10,7 +10,7 @@ try {
   const cwd=path.resolve(__dirname,'../node');
   const npm=process.platform==='win32'?process.execPath:'npm';
   const npmPrefix=process.platform==='win32'?[process.env.npm_execpath?.endsWith('npm-cli.js')?process.env.npm_execpath:path.join(path.dirname(process.execPath),'node_modules/npm/bin/npm-cli.js')]:[];
-  const packed=JSON.parse(execFileSync(npm,[...npmPrefix,'--cache',path.join(work,'npm-cache'),'pack','--ignore-scripts','--json','--pack-destination',work],{cwd,encoding:'utf8'}))[0];
+  const packed=Object.values(JSON.parse(execFileSync(npm,[...npmPrefix,'--cache',path.join(work,'npm-cache'),'pack','--ignore-scripts','--json','--pack-destination',work],{cwd,encoding:'utf8'})))[0];
   for(const required of ['index.js','wrapper.js','wrapper.d.ts'])if(!packed.files.some(f=>f.path===required))throw new Error(`native package missing ${required}`);
   const unpack=path.join(work,'unpack');mkdirSync(unpack);
   execFileSync('tar',['-xzf',path.join(work,packed.filename),'-C',unpack]);
@@ -31,7 +31,7 @@ try {
       const binary=`${manifest.napi.binaryName}.${target.platformArchABI}.node`;
       assert.equal(native.main,binary);
       assert.ok(readFileSync(path.join(dir,binary)).length>0,'native artifact must be present');
-      const tar=JSON.parse(execFileSync(npm,[...npmPrefix,'--cache',path.join(work,'npm-cache'),'pack','--ignore-scripts','--json','--pack-destination',work],{cwd:dir,encoding:'utf8'}))[0];
+      const tar=Object.values(JSON.parse(execFileSync(npm,[...npmPrefix,'--cache',path.join(work,'npm-cache'),'pack','--ignore-scripts','--json','--pack-destination',work],{cwd:dir,encoding:'utf8'})))[0];
       assert.ok(tar.files.some(file=>file.path===binary),'platform tarball must include its binary');
       const destination=path.join(unpack,'package/node_modules',native.name);
       mkdirSync(destination,{recursive:true});

@@ -8,7 +8,7 @@ try {
   const cwd=fileURLToPath(new URL('../wasm',import.meta.url));
   const npm=process.platform==='win32'?process.execPath:'npm';
   const npmPrefix=process.platform==='win32'?[process.env.npm_execpath?.endsWith('npm-cli.js')?process.env.npm_execpath:join(dirname(process.execPath),'node_modules/npm/bin/npm-cli.js')]:[];
-  const packed=JSON.parse(execFileSync(npm,[...npmPrefix,'--cache',join(work,'npm-cache'),'pack','--ignore-scripts','--json','--pack-destination',work],{cwd,encoding:'utf8'}))[0];
+  const packed=Object.values(JSON.parse(execFileSync(npm,[...npmPrefix,'--cache',join(work,'npm-cache'),'pack','--ignore-scripts','--json','--pack-destination',work],{cwd,encoding:'utf8'})))[0];
   const unpack=join(work,'unpack');await mkdir(unpack);execFileSync('tar',['-xzf',join(work,packed.filename),'-C',unpack]);
   const root=join(unpack,'package'),metadata=JSON.parse(await readFile(join(root,'package.json'),'utf8'));
   for(const entry of Object.values(metadata.exports))if(entry.types)await readFile(join(root,entry.types));
