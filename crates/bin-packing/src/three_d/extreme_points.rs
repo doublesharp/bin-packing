@@ -739,7 +739,7 @@ fn union_area(rects: &[(u32, u32, u32, u32)]) -> u64 {
         return 0;
     }
 
-    events.sort_unstable_by(|left, right| left.x.cmp(&right.x));
+    events.sort_unstable_by_key(|event| event.x);
 
     let mut active: Vec<(u32, u32)> = Vec::with_capacity(rects.len());
     let mut scratch: Vec<(u32, u32)> = Vec::with_capacity(rects.len());

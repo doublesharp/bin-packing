@@ -89,7 +89,7 @@ pub(super) fn solve_column_building(
 
     // 2. Sort by footprint area descending (stable) so stacks with large
     //    bases open first.
-    flat_items.sort_by(|left, right| right.flat_area.cmp(&left.flat_area));
+    flat_items.sort_by_key(|item| std::cmp::Reverse(item.flat_area));
 
     // 3. Build the stacks. We don't know which bin each stack will land in
     //    yet, so the per-bin height cap uses the *maximum* available bin

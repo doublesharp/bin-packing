@@ -468,7 +468,7 @@ impl OneDSolution {
             .iter()
             .map(|piece| CutAssignment1D { name: piece.name.clone(), length: piece.length })
             .collect::<Vec<_>>();
-        unplaced_cuts.sort_by(|left, right| right.length.cmp(&left.length));
+        unplaced_cuts.sort_by_key(|cut| std::cmp::Reverse(cut.length));
 
         Self {
             algorithm: algorithm.into(),
