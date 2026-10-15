@@ -124,3 +124,111 @@ pub(super) fn solve_rotation_search(
         })),
     }
 }
+
+/// Bounded mixed counts and orders. Count assignments constrain each individual
+/// instance while preserving its original dimensions and grain permission.
+/// Candidate MaxRects packing is heuristic, even if every count vector is tried.
+pub(super) fn solve_mixed_rotations(
+    problem: TwoDProblem,
+    mut options: TwoDOptions,
+) -> Result<TwoDSolution> {
+    use super::bounded_search;
+    use rand::seq::SliceRandom;
+    let indexed = bounded_search::prepare(&problem, &options)?;
+    options.seed = Some(options.seed.unwrap_or(0));
+    let mut best = bounded_search::baseline(&indexed, &options)?;
+    if options.guillotine_required {
+        best.metrics
+            .notes
+            .push("mixed-rotation MaxRects search skipped for required guillotine layouts".into());
+        return bounded_search::restore(&problem, &indexed, best);
+    }
+    let baseline_states = best.metrics.explored_states;
+    let baseline_iterations = best.metrics.iterations;
+    let rotatable = rotatable_demand_indices(&indexed);
+    let combinations = rotatable
+        .iter()
+        .fold(1usize, |n, &i| n.saturating_mul(indexed.demands[i].quantity.saturating_add(1)));
+    let max_trials = options.multistart_runs.clamp(1, 16) * 8;
+    let assignment_limit = max_trials.div_ceil(3);
+    let assignment_count = combinations.min(assignment_limit);
+    let exhaustive_counts = combinations <= assignment_limit;
+    let mut trials = 0usize;
+    let mut rejected = 0usize;
+    for assignment in 0..assignment_count {
+        let mut rng = SmallRng::seed_from_u64(crate::parallel::iteration_seed(
+            options.seed.unwrap_or(0),
+            assignment,
+        ));
+        let mut residue = assignment;
+        let counts: Vec<_> = rotatable
+            .iter()
+            .map(|&i| {
+                let quantity = indexed.demands[i].quantity;
+                if exhaustive_counts {
+                    let count = residue % (quantity + 1);
+                    residue /= quantity + 1;
+                    count
+                } else {
+                    match assignment {
+                        0 => quantity / 2,
+                        1 => 0,
+                        2 => quantity,
+                        _ => (rng.next_u64() % (quantity as u64 + 1)) as usize,
+                    }
+                }
+            })
+            .collect();
+        for order in 0..3 {
+            if trials == max_trials {
+                break;
+            }
+            let mut items = Vec::new();
+            for (demand_index, demand) in indexed.demands.iter().enumerate() {
+                let count = rotatable.iter().position(|&i| i == demand_index).map(|i| counts[i]);
+                for occurrence in 0..demand.quantity {
+                    let fixed_rotation = count.map(|count| {
+                        if order == 1 {
+                            occurrence < count.div_ceil(2)
+                                || occurrence >= demand.quantity - count / 2
+                        } else {
+                            occurrence < count
+                        }
+                    });
+                    items.push(ItemInstance2D {
+                        name: demand.name.clone(),
+                        width: demand.width,
+                        height: demand.height,
+                        can_rotate: demand.can_rotate,
+                        fixed_rotation,
+                    });
+                }
+            }
+            if order == 2 {
+                items.shuffle(&mut rng);
+            } else {
+                maxrects::sort_items_descending(&mut items);
+            }
+            trials += 1;
+            let candidate = maxrects::pack_with_order(
+                &indexed,
+                &options,
+                &items,
+                "mixed_rotations",
+                trials,
+                MaxRectsStrategy::BestAreaFit,
+            )?;
+            if bounded_search::validate_solution(&indexed, &candidate).is_err() {
+                rejected += 1;
+                continue;
+            }
+            if candidate.is_better_than(&best) {
+                best = candidate;
+            }
+        }
+    }
+    best.metrics.iterations = baseline_iterations.saturating_add(trials);
+    best.metrics.explored_states = baseline_states.saturating_add(trials);
+    best.metrics.notes.push(format!("opt-in mixed rotations: {assignment_count} count assignments, {trials} packing/order trials, {rejected} rejected layouts; exhaustive count vectors={exhaustive_counts}; placement/order coverage is heuristic; baseline retained unless improved"));
+    bounded_search::restore(&problem, &indexed, best)
+}

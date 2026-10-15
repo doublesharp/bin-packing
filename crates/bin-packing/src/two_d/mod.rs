@@ -3,6 +3,7 @@
 //! Provides MaxRects (several heuristics), Skyline, Guillotine beam search, and shelf-based
 //! NFDH/FFDH/BFDH algorithms plus a multistart meta-strategy.
 
+mod bounded_search;
 pub mod cut_plan;
 mod drops;
 mod guillotine;
@@ -81,6 +82,38 @@ pub fn solve_2d(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSoluti
         TwoDAlgorithm::RotationSearch => rotation_search::solve_rotation_search(&problem, &options),
         TwoDAlgorithm::Auto => solve_auto(problem, options),
     }
+}
+
+/// Opt-in MaxRects shortlist scoring by remaining-demand opportunity loss.
+///
+/// Retains the requested ordinary solver as incumbent. Scores at most 16 geometric
+/// candidates per placement using only free rectangles. Overlapping maximal spaces
+/// are never summed as independent capacity. Guillotine-required jobs return their
+/// baseline unchanged. Unspecified seeds use zero in this explicit API.
+///
+/// # Errors
+/// Returns ordinary validation/feasibility errors or an unsupported work limit.
+/// Limits are 128 parts, 64 demand types, 8 stocks, 8 rotatable types, beam width
+/// 1..=32 and multistart runs 1..=16. No global optimality is claimed.
+pub fn solve_2d_demand_aware(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution> {
+    bounded_search::demand_aware(problem, options)
+}
+
+/// Opt-in search of mixed rotation counts within each repeated demand type.
+///
+/// Retains the requested baseline. Tries at most 128 MaxRects packing/order trials,
+/// including seeded item orders, over bounded count vectors. Trying every count
+/// vector does not exhaust placements or certify an optimum. Guillotine-required
+/// jobs return their baseline. Unspecified seeds use zero here.
+///
+/// # Errors
+/// Returns ordinary validation/feasibility errors or the same bounded input/control
+/// errors as [`solve_2d_demand_aware`]. Candidate layouts are independently validated.
+pub fn solve_2d_mixed_rotations(
+    problem: TwoDProblem,
+    options: TwoDOptions,
+) -> Result<TwoDSolution> {
+    rotation_search::solve_mixed_rotations(problem, options)
 }
 
 type SolverFn2D = fn(&TwoDProblem, &TwoDOptions) -> Result<TwoDSolution>;
