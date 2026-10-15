@@ -391,6 +391,12 @@ pub(crate) struct Rect {
 
 impl TwoDProblem {
     pub(crate) fn validate(&self) -> Result<()> {
+        self.validate_source(false)
+    }
+
+    /// Validate original source records before an indexed API assigns unique names.
+    /// Duplicate stock labels are permitted only when indices preserve their identity.
+    pub(crate) fn validate_source(&self, indexed_identity: bool) -> Result<()> {
         if self.sheets.is_empty() {
             return Err(BinPackingError::InvalidInput(
                 "at least one sheet stock entry is required".to_string(),
@@ -405,7 +411,7 @@ impl TwoDProblem {
 
         let mut sheet_names = HashSet::new();
         for sheet in &self.sheets {
-            if !sheet_names.insert(sheet.name.as_str()) {
+            if !indexed_identity && !sheet_names.insert(sheet.name.as_str()) {
                 return Err(BinPackingError::InvalidInput(format!(
                     "sheet name `{}` must be unique",
                     sheet.name

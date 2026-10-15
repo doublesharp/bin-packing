@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 /// Errors returned by the bin-packing solvers.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum BinPackingError {
     /// The problem failed input validation (e.g. empty demand list, zero dimension, invalid cost).

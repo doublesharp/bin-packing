@@ -7,6 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::BinPackingError;
+
 use super::saw_plan::{
     SawJob2D, SawLayout2D, SawPlanError2D, SawPlanOptions2D, SawRect2D, SawSearchLimits2D,
     WorkpieceId2D, plan_saw_cuts,
@@ -141,9 +143,9 @@ pub enum ReuseError2D {
         /// Rejected field or input-size bound.
         field: &'static str,
     },
-    /// Current problem or solver failure.
-    #[error("invalid reuse problem: {0}")]
-    InvalidProblem(String),
+    /// Typed current-problem validation or solver failure, using original source names.
+    #[error("reuse solver failure: {0}")]
+    Solver(#[from] BinPackingError),
     /// Explicit material budget was exceeded.
     #[error("reuse material budget exceeded: {sheet_count} sheets, cost {cost}")]
     MaterialBudget {
@@ -463,10 +465,10 @@ pub fn solve_2d_with_reuse(
     }
     options.auto_rotation_search_max_types = options.auto_rotation_search_max_types.min(8);
     options.seed = Some(options.seed.unwrap_or(0));
+    problem.validate_source(true)?;
+    problem.ensure_feasible_demands()?;
     let indexed = indexed_problem(&problem);
-    indexed.validate().map_err(|e| ReuseError2D::InvalidProblem(e.to_string()))?;
-    let mut solution = solve_2d(indexed.clone(), options.clone())
-        .map_err(|e| ReuseError2D::InvalidProblem(e.to_string()))?;
+    let mut solution = solve_2d(indexed.clone(), options.clone())?;
     let mut job = source_job(&problem, &indexed, &mut solution)?;
     let baseline_sheet_count = solution.sheet_count;
     let baseline_material_cost = solution.total_cost;
@@ -496,8 +498,8 @@ pub fn solve_2d_with_reuse(
             continue;
         }
         candidate_solves += 1;
-        let mut candidate = solve_2d(indexed.clone(), TwoDOptions { algorithm, ..options.clone() })
-            .map_err(|e| ReuseError2D::InvalidProblem(e.to_string()))?;
+        let mut candidate =
+            solve_2d(indexed.clone(), TwoDOptions { algorithm, ..options.clone() })?;
         let candidate_job = source_job(&problem, &indexed, &mut candidate)?;
         if let Err(error) = check_material(&candidate_job, &effective) {
             match error {

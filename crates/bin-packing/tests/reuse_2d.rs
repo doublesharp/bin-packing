@@ -304,3 +304,59 @@ fn input_rotation_geometry_inventory_and_serde_are_validated() {
         .expect("forecast input")
     );
 }
+
+#[test]
+fn infeasible_solver_error_retains_type_and_original_demand_name() {
+    let mut problem = job(12, 8, 13, 8, 0).problem;
+    problem.demands[0].name = "door".into();
+    let error = solve_2d_with_reuse(
+        problem,
+        TwoDOptions::default(),
+        &ReuseForecast2D::default(),
+        &ReuseOptions2D::default(),
+    )
+    .expect_err("oversized door must fail");
+    let source = std::error::Error::source(&error)
+        .and_then(|source| source.downcast_ref::<bin_packing::BinPackingError>());
+    assert!(
+        matches!(
+            source,
+            Some(bin_packing::BinPackingError::Infeasible2D { item, width: 13, height: 8 })
+                if item == "door"
+        ),
+        "expected original typed infeasibility, got {error:?}"
+    );
+}
+
+#[test]
+fn malformed_sources_retain_validation_error_and_original_names() {
+    for malformed_stock in [false, true] {
+        let mut problem = job(12, 8, 2, 8, 0).problem;
+        let original_name = if malformed_stock {
+            problem.sheets[0].name = "oak panel".into();
+            problem.sheets[0].width = 0;
+            "oak panel"
+        } else {
+            problem.demands[0].name = "cabinet door".into();
+            problem.demands[0].width = 0;
+            "cabinet door"
+        };
+        let error = solve_2d_with_reuse(
+            problem,
+            TwoDOptions::default(),
+            &ReuseForecast2D::default(),
+            &ReuseOptions2D::default(),
+        )
+        .expect_err("zero dimension must fail");
+        let source = std::error::Error::source(&error)
+            .and_then(|source| source.downcast_ref::<bin_packing::BinPackingError>());
+        assert!(
+            matches!(
+                source,
+                Some(bin_packing::BinPackingError::InvalidInput(message))
+                    if message.contains(original_name)
+            ),
+            "expected original typed validation error, got {error:?}"
+        );
+    }
+}
