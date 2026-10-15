@@ -360,3 +360,44 @@ fn malformed_sources_retain_validation_error_and_original_names() {
         );
     }
 }
+
+#[test]
+fn restored_source_order_preserves_ordinary_baseline_cost_bits() {
+    let mut problem = job(10, 10, 10, 10, 0).problem;
+    problem.demands[0].quantity = 3;
+    problem.sheets = [("z", 0.1), ("y", 0.2), ("x", 0.3)]
+        .into_iter()
+        .map(|(name, cost)| Sheet2D { name: name.into(), cost, ..problem.sheets[0].clone() })
+        .collect();
+    let options = TwoDOptions { algorithm: TwoDAlgorithm::Guillotine, ..Default::default() };
+    let ordinary =
+        bin_packing::two_d::solve_2d(problem.clone(), options.clone()).expect("ordinary");
+    let reused = solve_2d_with_reuse(
+        problem,
+        options,
+        &ReuseForecast2D::default(),
+        &ReuseOptions2D { max_candidate_solves: 1, ..Default::default() },
+    )
+    .expect("reuse baseline");
+    assert_eq!(reused.solution.total_cost.to_bits(), ordinary.total_cost.to_bits());
+    assert_eq!(reused.baseline_material_cost.to_bits(), ordinary.total_cost.to_bits());
+    assert_eq!(reused.solution.layouts, ordinary.layouts);
+    assert_eq!(reused.job.stock_indices, vec![2, 1, 0]);
+    assert_eq!(reused.job.demand_indices, vec![vec![0]; 3]);
+}
+
+#[test]
+fn bounded_reuse_rejects_aggregate_area_overflow_before_solving() {
+    let mut problem = job(1_000_000_000, 1_000_000_000, 600_000_000, 600_000_000, 0).problem;
+    problem.sheets[0].quantity = None;
+    problem.demands[0].quantity = 96;
+    assert!(matches!(
+        solve_2d_with_reuse(
+            problem,
+            TwoDOptions { algorithm: TwoDAlgorithm::Guillotine, ..Default::default() },
+            &ReuseForecast2D::default(),
+            &ReuseOptions2D { max_candidate_solves: 1, ..Default::default() },
+        ),
+        Err(ReuseError2D::InvalidOption { field: "aggregate sheet area exceeds u64" })
+    ));
+}

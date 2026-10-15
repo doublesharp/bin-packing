@@ -423,6 +423,25 @@ fn source_job(
         )?;
         demand.name = problem.demands[index].name.clone();
     }
+    // Restore the ordinary builder's ordering before summing float costs or
+    // setting baseline ceilings. Move identity maps with their exact layouts.
+    let mut mapped_layouts: Vec<_> = std::mem::take(&mut solution.layouts)
+        .into_iter()
+        .zip(stock_indices)
+        .zip(demand_indices)
+        .map(|((layout, stock), demands)| (layout, stock, demands))
+        .collect();
+    mapped_layouts.sort_by(|(left, _, _), (right, _, _)| {
+        right.used_area.cmp(&left.used_area).then_with(|| left.sheet_name.cmp(&right.sheet_name))
+    });
+    let mut stock_indices = Vec::with_capacity(mapped_layouts.len());
+    let mut demand_indices = Vec::with_capacity(mapped_layouts.len());
+    for (layout, stock, demands) in mapped_layouts {
+        solution.layouts.push(layout);
+        stock_indices.push(stock);
+        demand_indices.push(demands);
+    }
+    solution.total_cost = solution.layouts.iter().map(|layout| layout.cost).sum();
     Ok(SawJob2D {
         problem: problem.clone(),
         layouts: solution.layouts.iter().map(SawLayout2D::from).collect(),
@@ -439,6 +458,8 @@ fn source_job(
 /// retain the ordinary comparator. Sheet count and cost default to baseline
 /// ceilings; callers may explicitly override either. All inventory caps remain hard.
 /// Current jobs are capped at 8 stock types, 64 demand types and 128 total parts.
+/// The largest sheet area times total part quantity must fit in `u64`, a
+/// conservative pre-solve bound that keeps aggregate area arithmetic representable.
 /// Options must use beam width 1..=32, multistart runs 1..=16, and the rotation enumeration threshold is capped at 8.
 /// A fixed fallback seed of zero makes unspecified seeds reproducible here.
 /// The baseline itself must admit a physical saw decomposition.
@@ -454,10 +475,8 @@ pub fn solve_2d_with_reuse(
     reuse: &ReuseOptions2D,
 ) -> Result<ReuseSolution2D, ReuseError2D> {
     validate(forecast, reuse)?;
-    if problem.sheets.len() > 8
-        || problem.demands.len() > 64
-        || problem.demands.iter().fold(0usize, |n, d| n.saturating_add(d.quantity)) > 128
-    {
+    let quantity = problem.demands.iter().fold(0usize, |n, d| n.saturating_add(d.quantity));
+    if problem.sheets.len() > 8 || problem.demands.len() > 64 || quantity > 128 {
         return Err(ReuseError2D::InvalidOption { field: "problem exceeds bounded reuse size" });
     }
     if !(1..=32).contains(&options.beam_width) || !(1..=16).contains(&options.multistart_runs) {
@@ -466,6 +485,15 @@ pub fn solve_2d_with_reuse(
     options.auto_rotation_search_max_types = options.auto_rotation_search_max_types.min(8);
     options.seed = Some(options.seed.unwrap_or(0));
     problem.validate_source(true)?;
+    let max_sheet_area = problem
+        .sheets
+        .iter()
+        .map(|sheet| u128::from(sheet.width) * u128::from(sheet.height))
+        .max()
+        .unwrap_or(0);
+    if max_sheet_area * quantity as u128 > u128::from(u64::MAX) {
+        return Err(ReuseError2D::InvalidOption { field: "aggregate sheet area exceeds u64" });
+    }
     problem.ensure_feasible_demands()?;
     let indexed = indexed_problem(&problem);
     let mut solution = solve_2d(indexed.clone(), options.clone())?;
