@@ -220,11 +220,14 @@ fn seeded_count_and_order_search_improves_sampled_auto_but_not_full_auto() {
 }
 
 #[test]
-fn bounds_duplicate_source_names_and_guillotine_constraints_are_explicit() {
+fn bounds_duplicate_demand_names_and_guillotine_constraints_are_explicit() {
     for solver in [solve_2d_demand_aware, solve_2d_mixed_rotations] {
-        let mut p = problem(8, 10, &[(8, 10, 1, false), (8, 10, 1, false)]);
+        let mut p = problem(8, 10, &[(8, 10, 1, false), (4, 10, 1, false)]);
         p.sheets[0].quantity = Some(1);
-        p.sheets.push(p.sheets[0].clone());
+        let mut second_stock = p.sheets[0].clone();
+        second_stock.name = "second-sheet".into();
+        second_stock.width = 4;
+        p.sheets.push(second_stock);
         p.demands[1].name = p.demands[0].name.clone();
         let options =
             TwoDOptions { algorithm: TwoDAlgorithm::MaxRects, seed: Some(3), ..Default::default() };
@@ -232,7 +235,21 @@ fn bounds_duplicate_source_names_and_guillotine_constraints_are_explicit() {
             solver(p.clone(), options.clone()).expect("source indices survive duplicate labels");
         assert_eq!(selected.sheet_count, 2);
         assert!(selected.unplaced.is_empty());
-        assert_eq!(selected.layouts.iter().map(|s| s.placements.len()).sum::<usize>(), 2);
+        let mut dimensions = selected
+            .layouts
+            .iter()
+            .flat_map(|s| &s.placements)
+            .map(|p| (p.width, p.height))
+            .collect::<Vec<_>>();
+        dimensions.sort_unstable();
+        assert_eq!(dimensions, vec![(4, 10), (8, 10)]);
+        assert!(
+            selected
+                .layouts
+                .iter()
+                .flat_map(|s| &s.placements)
+                .all(|part| part.name == p.demands[0].name)
+        );
         p.demands[0].quantity = 129;
         assert!(matches!(
             solver(p, options.clone()),
@@ -255,6 +272,82 @@ fn bounds_duplicate_source_names_and_guillotine_constraints_are_explicit() {
         assert!(matches!(
             solver(invalid, options),
             Err(bin_packing::BinPackingError::InvalidInput(_))
+        ));
+    }
+}
+
+#[test]
+fn experimental_boundaries_reject_duplicate_stock_names() {
+    for solver in [solve_2d_demand_aware, solve_2d_mixed_rotations] {
+        let mut p = problem(10, 10, &[(8, 10, 1, false)]);
+        let mut second = p.sheets[0].clone();
+        second.width = 8;
+        second.cost = 2.0;
+        p.sheets.push(second);
+        assert!(matches!(
+            solver(p, TwoDOptions::default()),
+            Err(bin_packing::BinPackingError::InvalidInput(message))
+                if message == "sheet name `sheet` must be unique"
+        ));
+    }
+}
+
+#[test]
+fn experimental_boundaries_preserve_original_error_names() {
+    for solver in [solve_2d_demand_aware, solve_2d_mixed_rotations] {
+        let mut invalid = problem(10, 10, &[(0, 10, 1, false)]);
+        assert!(matches!(
+            solver(invalid.clone(), TwoDOptions::default()),
+            Err(bin_packing::BinPackingError::InvalidInput(message))
+                if message == "demand `part-0` must have positive width and height"
+        ));
+        invalid.demands[0].width = 11;
+        assert!(matches!(
+            solver(invalid, TwoDOptions::default()),
+            Err(bin_packing::BinPackingError::Infeasible2D { item, width: 11, height: 10 })
+                if item == "part-0"
+        ));
+    }
+}
+
+#[test]
+fn experimental_stock_identity_preserves_sorted_cost_and_full_baseline_accounting() {
+    let mut p = problem(10, 10, &[(10, 10, 3, false)]);
+    p.sheets = [("z", 0.1), ("y", 0.2), ("x", 0.3)]
+        .into_iter()
+        .map(|(name, cost)| Sheet2D {
+            name: name.into(),
+            cost,
+            quantity: Some(1),
+            ..p.sheets[0].clone()
+        })
+        .collect();
+    let options =
+        TwoDOptions { algorithm: TwoDAlgorithm::MaxRects, seed: Some(3), ..Default::default() };
+    let baseline = solve_2d(p.clone(), options.clone()).expect("ordinary baseline");
+    assert_eq!(baseline.total_cost, 0.6);
+    for solver in [solve_2d_demand_aware, solve_2d_mixed_rotations] {
+        let selected = solver(p.clone(), options.clone()).expect("bounded experiment");
+        assert_eq!(selected.total_cost, baseline.total_cost);
+        validate(&p, &selected);
+        // Algorithms and effort differ; the entire returned packing and all
+        // accounting fields must agree for this forced three-stock solution.
+        let comparable = TwoDSolution {
+            algorithm: baseline.algorithm.clone(),
+            metrics: baseline.metrics.clone(),
+            ..selected
+        };
+        assert_eq!(comparable, baseline);
+    }
+}
+
+#[test]
+fn experimental_boundaries_reject_aggregate_area_overflow_before_baseline() {
+    let p = problem(1_000_000_000, 1_000_000_000, &[(600_000_000, 600_000_000, 96, false)]);
+    for solver in [solve_2d_demand_aware, solve_2d_mixed_rotations] {
+        assert!(matches!(
+            solver(p.clone(), TwoDOptions::default()),
+            Err(bin_packing::BinPackingError::Unsupported(_))
         ));
     }
 }

@@ -94,7 +94,10 @@ pub fn solve_2d(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSoluti
 /// # Errors
 /// Returns ordinary validation/feasibility errors or an unsupported work limit.
 /// Limits are 128 parts, 64 demand types, 8 stocks, 8 rotatable types, beam width
-/// 1..=32 and multistart runs 1..=16. No global optimality is claimed.
+/// 1..=32 and multistart runs 1..=16. The largest stock area times total part
+/// count must fit in `u64`; inputs exceeding that bound are rejected before
+/// expansion or packing. Stock names must be unique, as in [`solve_2d`].
+/// No global optimality is claimed.
 pub fn solve_2d_demand_aware(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution> {
     bounded_search::demand_aware(problem, options)
 }
