@@ -1,0 +1,80 @@
+{
+  "code_commit": "1c05c74318f610b35418a9c79e10b4c7819831fa",
+  "baseline_commit": "0b626ac920d2ef5845c5e1763a2999ee5baf0c29",
+  "matched_ordinary_inputs": 16,
+  "unchanged_ordinary_outputs": [
+    "pattern-count",
+    "pattern-offcuts",
+    "demand-space",
+    "mixed-rotations",
+    "demand-space-auto",
+    "mixed-rotations-auto",
+    "repair-strip",
+    "arc-mixed",
+    "arc-repeated",
+    "forecast-reuse"
+  ],
+  "batched_output_equal_to_baseline_excluding_new_zero_diagnostics": true,
+  "all_commands_exit_code": 0,
+  "checks": [
+    {
+      "name": "quality",
+      "command": "CARGO_BUILD_JOBS=2 ./scripts/check-quality.sh",
+      "log_file": "common-quality-post-saw.log",
+      "log_sha256": "086a028d16074fc6b63f6ac092e07accd1d2a34646e1954ce490c450a7d08609"
+    },
+    {
+      "name": "doctests",
+      "command": "CARGO_BUILD_JOBS=2 python3 scripts/scratch.py run cargo test -p bin-packing --doc --all-features --locked",
+      "log_file": "common-doctests-post-saw.log",
+      "log_sha256": "686d0a3a87866a86cd384de58d1f5f1bb2e6909d9f767a6db9ab204df00f2da8"
+    },
+    {
+      "name": "features",
+      "command": "CARGO_BUILD_JOBS=2 ./scripts/check-features.sh",
+      "log_file": "common-features-post-saw.log",
+      "log_sha256": "9cf711210045f52d8ef57f93330bdf7a6e55ad406bb601096f74ccf840bd6180"
+    },
+    {
+      "name": "consumers",
+      "command": "CARGO_BUILD_JOBS=2 TSC_PATH=<temporary TypeScript 5.9.3> PLAYWRIGHT_PATH=<installed Playwright> ./scripts/check-bindings.sh",
+      "log_file": "common-bindings-post-saw.log",
+      "log_sha256": "5ca2e354bcab562de36210d5ff50bbe2b751256642ee09dbf67b4b1fbe887cba"
+    },
+    {
+      "name": "measurement",
+      "command": "python3 scripts/run-packing-experiments.py --baseline <pinned-baseline> --candidate <common-branch> --output <measurements.json>",
+      "log_file": "measurements-post-saw.log",
+      "log_sha256": "ea1e1ca678174e37d31378d339d3f08b1caaefb1f82a47018a1077475c5ae223"
+    }
+  ],
+  "rust_tests": {
+    "passed": 409,
+    "failed": 0,
+    "ignored_manual_benchmark": 1
+  },
+  "python_tests_passed": 4,
+  "doctests_passed": 2,
+  "native_node_tests_passed": 12,
+  "wasm_tests_passed": 31,
+  "rust_feature_configurations": 8,
+  "wasm_feature_configurations": 9,
+  "fuzz_target_status": "compiled and clippy checked; no fuzz campaign executed",
+  "package_declarations_type_checked": 13,
+  "finder": {
+    "cases": 300,
+    "solver_calls": 1800
+  },
+  "browser": {
+    "version": "151.0.7922.34",
+    "package_variants_passed": 4
+  },
+  "independent_source_review": "passed, including consumer types and sequential-only saw pruning",
+  "cleanup": {
+    "archived_temporary_worktrees": 11,
+    "removed_build_kib": 15195032,
+    "temporary_typescript_compiler_removed": true,
+    "common_worktree_retained": true,
+    "main_clean_and_at_baseline": true
+  }
+}
