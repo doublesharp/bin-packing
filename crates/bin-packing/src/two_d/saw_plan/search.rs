@@ -14,6 +14,110 @@ struct State {
     trace: Option<Rc<Trace>>,
 }
 
+// Ancestry operation IDs are trace-local. They do not change any future move;
+// the retained representative supplies its own valid creating-cut dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct ReadyKey {
+    id: WorkpieceId2D,
+    stock_index: usize,
+    parts: Vec<usize>,
+    orientation: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct FutureKey {
+    ready: Vec<ReadyKey>,
+    next_sheet: Option<usize>,
+    active_setup: Option<(SawSetupKind2D, u32)>,
+    used_accessories: u8,
+}
+
+fn future_key(
+    state: &State,
+    index: usize,
+    split: &Split,
+    edge: ReferenceEdge2D,
+    job: &SawJob2D,
+    options: &SawPlanOptions2D,
+) -> FutureKey {
+    let change = transition(state, index, split.cut, edge, options);
+    let mut ready: Vec<_> = state
+        .ready
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != index)
+        .map(|(_, p)| ReadyKey {
+            id: p.id,
+            stock_index: job.stock_indices[p.id.sheet_index],
+            parts: p.parts.clone(),
+            orientation: p.orientation,
+        })
+        .collect();
+    ready.extend(split.children.iter().filter(|p| !p.terminal(job)).map(|p| ReadyKey {
+        id: p.id,
+        stock_index: job.stock_indices[p.id.sheet_index],
+        parts: p.parts.clone(),
+        orientation: change.orientation,
+    }));
+    ready.sort();
+    FutureKey {
+        next_sheet: (!options.batch_across_sheets)
+            .then(|| ready.first().map(|p| p.id.sheet_index))
+            .flatten(),
+        ready,
+        active_setup: Some((change.setup.kind, change.setup.distance)),
+        used_accessories: change.used_accessories,
+    }
+}
+
+fn dominates(a: SawCounts2D, b: SawCounts2D) -> bool {
+    a.cuts <= b.cuts
+        && a.initial_setups <= b.initial_setups
+        && a.setup_changes <= b.setup_changes
+        && a.rotations <= b.rotations
+        && a.handling <= b.handling
+}
+
+#[derive(Default)]
+struct DominanceTable {
+    entries: BTreeMap<FutureKey, Vec<SawCounts2D>>,
+    units: usize,
+    peak_units: usize,
+    saturated: bool,
+}
+
+impl DominanceTable {
+    // Per-depth lookup costs O(log K + F), plus O(P) key construction. K keys
+    // and Pareto-front count vectors consume at most 65,536 scalar storage units.
+    // Once full, uncached moves remain eligible: memory pressure never discards a state.
+    fn admit(&mut self, key: &FutureKey, counts: SawCounts2D) -> bool {
+        if let Some(front) = self.entries.get_mut(key) {
+            if front.iter().any(|&old| dominates(old, counts)) {
+                return false;
+            }
+            let removed = front.iter().filter(|&&old| dominates(counts, old)).count();
+            let new_units = self.units.saturating_sub(5 * removed).saturating_add(5);
+            if new_units > 65536 {
+                self.saturated = true;
+                return true;
+            }
+            front.retain(|&old| !dominates(counts, old));
+            front.push(counts);
+            self.units = new_units;
+        } else {
+            let units = 16 + key.ready.iter().map(|p| 8 + p.parts.len()).sum::<usize>() + 5;
+            if self.entries.len() == 4096 || units > 65536usize.saturating_sub(self.units) {
+                self.saturated = true;
+                return true;
+            }
+            self.entries.insert(key.clone(), vec![counts]);
+            self.units += units;
+        }
+        self.peak_units = self.peak_units.max(self.units);
+        true
+    }
+}
+
 struct Trace {
     previous: Option<Rc<Trace>>,
     operations: Vec<SawOperation2D>,
@@ -421,6 +525,7 @@ fn schedule_baseline_tree(
 // A ranked move borrows its parent and shares cached geometry. Only retained
 // moves allocate operation traces and ready-workpiece vectors.
 struct BeamMove<'a> {
+    key: FutureKey,
     state: &'a State,
     index: usize,
     split: Rc<Split>,
@@ -445,10 +550,14 @@ pub(super) fn plan(job: &SawJob2D, o: &SawPlanOptions2D) -> Result<SawPlan2D, Sa
     let mut beam = if start.ready.is_empty() { Vec::new() } else { vec![start] };
     let mut budget_exhausted = false;
     let mut beam_pruned = false;
+    let mut dominated_states = 0;
+    let mut peak_dominance_units = 0;
+    let mut dominance_table_saturated = false;
     // Search memory is bounded by beam_width, plus at most one successor batch.
     // Trace prefixes are shared through Rc; layouts and labels are never cloned per state.
     'search: while !beam.is_empty() {
-        let mut successors = Vec::new();
+        let mut dominance = DominanceTable::default();
+        let mut successors: Vec<BeamMove<'_>> = Vec::new();
         for state in &beam {
             for (index, piece) in state.ready.iter().enumerate() {
                 if !o.batch_across_sheets && piece.id.sheet_index != state.ready[0].id.sheet_index {
@@ -473,7 +582,17 @@ pub(super) fn plan(job: &SawJob2D, o: &SawPlanOptions2D) -> Result<SawPlan2D, Sa
                                 incumbent = apply(state, index, split, edge, job, o);
                             }
                         } else {
+                            let key = future_key(state, index, split, edge, job, o);
+                            let admitted = dominance.admit(&key, counts);
+                            dominated_states += usize::from(!admitted);
+                            peak_dominance_units = peak_dominance_units.max(dominance.peak_units);
+                            dominance_table_saturated |= dominance.saturated;
+                            if !admitted {
+                                continue;
+                            }
+                            successors.retain(|m| m.key != key || !dominates(counts, m.counts));
                             successors.push(BeamMove {
+                                key,
                                 state,
                                 index,
                                 split: Rc::clone(split),
@@ -544,6 +663,9 @@ pub(super) fn plan(job: &SawJob2D, o: &SawPlanOptions2D) -> Result<SawPlan2D, Sa
             explored_states,
             budget_exhausted,
             beam_pruned,
+            dominated_states,
+            peak_dominance_units,
+            dominance_table_saturated,
             optimality: if budget_exhausted || beam_pruned {
                 SawOptimality2D::Heuristic
             } else {
@@ -553,4 +675,63 @@ pub(super) fn plan(job: &SawJob2D, o: &SawPlanOptions2D) -> Result<SawPlan2D, Sa
             baseline_counts,
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key() -> FutureKey {
+        FutureKey {
+            ready: vec![ReadyKey {
+                id: WorkpieceId2D {
+                    sheet_index: 0,
+                    bounds: SawRect2D { x: 0, y: 0, width: 20, height: 20 },
+                },
+                stock_index: 0,
+                parts: vec![0, 1],
+                orientation: 0,
+            }],
+            next_sheet: Some(0),
+            active_setup: Some((SawSetupKind2D::RipFence, 10)),
+            used_accessories: 1,
+        }
+    }
+
+    #[test]
+    fn key_distinguishes_every_future_constraint_even_for_equal_dimensions() {
+        let original = key();
+        for mutation in 0..8 {
+            let mut changed = original.clone();
+            match mutation {
+                0 => changed.ready[0].id.sheet_index = 1,
+                1 => changed.ready[0].stock_index = 1,
+                2 => changed.ready[0].parts = vec![2, 3],
+                3 => changed.ready[0].orientation = 2,
+                4 => changed.next_sheet = None,
+                5 => changed.active_setup = Some((SawSetupKind2D::CrosscutStop, 10)),
+                6 => changed.active_setup = Some((SawSetupKind2D::RipFence, 11)),
+                _ => changed.used_accessories = 3,
+            }
+            assert_ne!(original, changed);
+        }
+    }
+
+    #[test]
+    fn dominance_keeps_tradeoffs_and_bypasses_full_tables() {
+        let key = key();
+        let mut table = DominanceTable::default();
+        let cuts = SawCounts2D { cuts: 2, rotations: 0, ..Default::default() };
+        let turns = SawCounts2D { cuts: 1, rotations: 1, ..Default::default() };
+        assert!(table.admit(&key, cuts));
+        assert!(table.admit(&key, turns));
+        assert!(!table.admit(&key, cuts));
+        assert_eq!(table.entries[&key].len(), 2);
+        let mut oversized = key.clone();
+        oversized.ready[0].parts = vec![0; 65536];
+        assert!(table.admit(&oversized, cuts));
+        assert!(table.saturated);
+        assert!(table.peak_units <= 65536);
+        assert!(!table.entries.contains_key(&oversized));
+    }
 }
