@@ -531,7 +531,7 @@ fn schedule_baseline_tree(
 // A ranked move borrows its parent and shares cached geometry. Only retained
 // moves allocate operation traces and ready-workpiece vectors.
 struct BeamMove<'a> {
-    key: FutureKey,
+    key: Option<FutureKey>,
     state: &'a State,
     index: usize,
     split: Rc<Split>,
@@ -562,7 +562,10 @@ pub(super) fn plan(job: &SawJob2D, o: &SawPlanOptions2D) -> Result<SawPlan2D, Sa
     // Search memory is bounded by beam_width, plus at most one successor batch.
     // Trace prefixes are shared through Rc; layouts and labels are never cloned per state.
     'search: while !beam.is_empty() {
-        let mut dominance = DominanceTable::default();
+        // A repeated-sheet release fixture was about 8x slower with batched
+        // canonical pruning, with no effort improvement. Sequential search
+        // benefited, so batched beams bypass key construction and table work.
+        let mut dominance = (!o.batch_across_sheets).then(DominanceTable::default);
         let mut successors: Vec<BeamMove<'_>> = Vec::new();
         for state in &beam {
             for (index, piece) in state.ready.iter().enumerate() {
@@ -588,15 +591,23 @@ pub(super) fn plan(job: &SawJob2D, o: &SawPlanOptions2D) -> Result<SawPlan2D, Sa
                                 incumbent = apply(state, index, split, edge, job, o);
                             }
                         } else {
-                            let key = future_key(state, index, split, edge, job, o);
-                            let admitted = dominance.admit(&key, counts);
-                            dominated_states += usize::from(!admitted);
-                            peak_dominance_units = peak_dominance_units.max(dominance.peak_units);
-                            dominance_table_saturated |= dominance.saturated;
-                            if !admitted {
-                                continue;
-                            }
-                            successors.retain(|m| m.key != key || !dominates(counts, m.counts));
+                            let key = if let Some(dominance) = dominance.as_mut() {
+                                let key = future_key(state, index, split, edge, job, o);
+                                let admitted = dominance.admit(&key, counts);
+                                dominated_states += usize::from(!admitted);
+                                peak_dominance_units =
+                                    peak_dominance_units.max(dominance.peak_units);
+                                dominance_table_saturated |= dominance.saturated;
+                                if !admitted {
+                                    continue;
+                                }
+                                successors.retain(|m| {
+                                    m.key.as_ref() != Some(&key) || !dominates(counts, m.counts)
+                                });
+                                Some(key)
+                            } else {
+                                None
+                            };
                             successors.push(BeamMove {
                                 key,
                                 state,

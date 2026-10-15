@@ -309,13 +309,16 @@ pub struct SawSearchReport2D {
     /// Whether the beam discarded states.
     pub beam_pruned: bool,
     /// Equivalent future states rejected by componentwise operation-count dominance.
+    /// Zero when cross-sheet batching bypasses dominance pruning.
     #[serde(default)]
     pub dominated_states: usize,
     /// Peak per-depth dominance storage in scalar units, at most 65,536.
     /// Excludes the beam, trace prefixes, allocator overhead and shared split cache.
+    /// Zero when cross-sheet batching bypasses dominance pruning.
     #[serde(default)]
     pub peak_dominance_units: usize,
     /// Some moves bypassed the full dominance table without being discarded.
+    /// False when cross-sheet batching bypasses dominance pruning.
     #[serde(default)]
     pub dominance_table_saturated: bool,
     /// Honest optimality scope.
