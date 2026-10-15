@@ -1,6 +1,6 @@
 # Packing experiment findings, 2026-10-14
 
-All seven ideas were implemented in separate managed worktrees and merged into `feature/packing-experiments`. The original `main` checkout remains at `0b626ac920d2ef5845c5e1763a2999ee5baf0c29`. The common branch is for testing. No release or remote push was made.
+All seven ideas were implemented in separate managed worktrees and merged into `feature/packing-experiments`. The original `main` checkout remains at `0b626ac920d2ef5845c5e1763a2999ee5baf0c29`. The common branch is for testing. At completion of this experiment phase, no release or remote push had been made.
 
 The strongest results are pattern recombination, joint 3D repair and the stronger exact 3D bound. The compressed 1D search improves a mixed-stock fixture but adds integer search work. Forecast reuse produces a useful layout when a forecast is available. Demand-aware placement and mixed rotation counts remain experimental, since the full ordinary Auto portfolio already matches their committed layouts.
 
@@ -93,7 +93,7 @@ The final combined code commit is `1c05c74318f610b35418a9c79e10b4c7819831fa`. Ev
 
 Independent focused reviews, corrective reviews, and [combined source review](2026-10-14-packing-review.md) passed. The review record includes follow-ups for the consumer declarations and sequential-only pruning restriction.
 
-Cleanup is complete. Eleven temporary managed worktrees were archived with recoverable snapshots. Only the common testing worktree remains attached. Owner-checked disposable builds freed 14.49 GiB, and the temporary TypeScript compiler was removed. The common build cache and lightweight diagnostic logs are retained for testing and evidence. Original main is clean at the baseline commit. No branches were force-updated, and nothing was pushed or published.
+Cleanup is complete. Eleven temporary managed worktrees were archived with recoverable snapshots. Only the common testing worktree remains attached. Owner-checked disposable builds freed 14.49 GiB, and the temporary TypeScript compiler was removed. The common build cache and lightweight diagnostic logs are retained for testing and evidence. Original main is clean at the baseline commit. No branches were force-updated, and nothing was pushed or published during the experiment phase.
 
 ## Reproduction
 
@@ -124,4 +124,4 @@ The runner copies only its measurement example and fixture data into the baselin
 
 All implementation and corrective commits are preserved in the common branch's merge history. Benchmark runner commit `a918a44` adds reproducible fixtures and Auto controls. Consumer-declaration correction `7558dcb` completes the saw report diagnostics. The final source review is retained beside this report.
 
-The final merge commit `1c05c74` includes the saw restriction. Later commits only save documentation and measurement evidence.
+The final merge commit `1c05c74` includes the saw restriction. The original experiment series ends at `b5876f0`. Subsequent test and version preparation is described in [v0.5.0](../releases/v0.5.0.md).
