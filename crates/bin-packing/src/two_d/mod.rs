@@ -9,6 +9,7 @@ mod guillotine;
 mod kerf;
 mod maxrects;
 mod model;
+mod pattern_pool;
 mod rotation_search;
 pub mod saw_plan;
 mod shelf;
@@ -18,6 +19,8 @@ pub use model::{
     Placement2D, RectDemand2D, Sheet2D, SheetLayout2D, SolverMetrics2D, TwoDAlgorithm, TwoDOptions,
     TwoDProblem, TwoDSolution,
 };
+
+pub use pattern_pool::solve_2d_recombined;
 
 use crate::Result;
 

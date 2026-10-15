@@ -1,0 +1,1 @@
+{"sheets":[{"name":"sheet","width":20,"height":20,"cost":1.0,"quantity":null,"kerf":0,"edge_kerf_relief":false}],"demands":[{"name":"0","width":6,"height":14,"quantity":7,"can_rotate":true},{"name":"1","width":11,"height":6,"quantity":8,"can_rotate":true},{"name":"2","width":13,"height":12,"quantity":8,"can_rotate":true}]}
