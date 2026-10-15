@@ -9,6 +9,7 @@ mod guillotine;
 mod kerf;
 mod maxrects;
 mod model;
+pub mod reuse;
 mod rotation_search;
 pub mod saw_plan;
 mod shelf;
