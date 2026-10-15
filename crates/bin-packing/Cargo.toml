@@ -65,3 +65,7 @@ required-features = ["two-d"]
 [[example]]
 name = "saw_stress"
 required-features = ["two-d"]
+
+[[example]]
+name = "packing_experiment_bench"
+required-features = ["one-d", "two-d", "three-d"]
