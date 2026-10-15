@@ -1203,3 +1203,22 @@ fn commuting_sheet_cuts_prune_only_sequential_search_and_preserve_physical_ident
         assert_eq!(plan, plan_saw_cuts(&job, &options).expect("deterministic replay"));
     }
 }
+
+#[test]
+fn legacy_saw_report_json_defaults_new_pruning_diagnostics() {
+    let plan = plan_saw_cuts(&strips(3, 2), &Default::default()).expect("physical saw plan");
+    let mut legacy = serde_json::to_value(&plan).expect("serialize current plan");
+    let report = legacy["search"].as_object_mut().expect("search report object");
+    for field in ["dominated_states", "peak_dominance_units", "dominance_table_saturated"] {
+        assert!(report.remove(field).is_some(), "current report must emit {field}");
+    }
+    let decoded: SawPlan2D =
+        serde_json::from_value(legacy).expect("legacy report remains readable");
+    assert_eq!(decoded.search.dominated_states, 0);
+    assert_eq!(decoded.search.peak_dominance_units, 0);
+    assert!(!decoded.search.dominance_table_saturated);
+    replay(&strips(3, 2), &decoded);
+    assert_eq!(decoded.operations, plan.operations);
+    assert_eq!(decoded.counts, plan.counts);
+    assert_eq!(decoded.effort_score, plan.effort_score);
+}

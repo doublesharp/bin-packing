@@ -446,3 +446,37 @@ fn arc_flow_benchmark_fixtures() {
         );
     }
 }
+
+#[test]
+fn zero_graph_budget_preserves_complete_auto_incumbent_across_seeds() {
+    let mut first = stock("first", 10, Some(2));
+    first.kerf = 1;
+    first.trim = 1;
+    first.cost = 0.1;
+    let mut second = stock("second", 8, Some(1));
+    second.kerf = 1;
+    second.cost = 0.2;
+    let problem = OneDProblem {
+        stock: vec![first, second],
+        demands: vec![demand("a", 4, 3), demand("b", 3, 2), demand("c", 1, 8)],
+    };
+    for seed in [0, 7, 17] {
+        let options = OneDOptions {
+            algorithm: OneDAlgorithm::Auto,
+            seed: Some(seed),
+            exact_pattern_limit: 0,
+            multistart_runs: 2,
+            ..Default::default()
+        };
+        let baseline = solve_1d(problem.clone(), options.clone()).expect("Auto incumbent");
+        let bounded = solve_1d_arc_flow(problem.clone(), options).expect("bounded fallback");
+        check(&problem, &bounded);
+        assert!(!bounded.exact);
+        assert_eq!(bounded.layouts, baseline.layouts);
+        assert_eq!(bounded.unplaced, baseline.unplaced);
+        assert_eq!(bounded.stock_requirements, baseline.stock_requirements);
+        assert_eq!(bounded.stock_count, baseline.stock_count);
+        assert_eq!(bounded.total_waste, baseline.total_waste);
+        assert_eq!(bounded.total_cost.to_bits(), baseline.total_cost.to_bits());
+    }
+}

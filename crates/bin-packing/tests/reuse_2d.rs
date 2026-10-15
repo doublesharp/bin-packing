@@ -401,3 +401,32 @@ fn bounded_reuse_rejects_aggregate_area_overflow_before_solving() {
         Err(ReuseError2D::InvalidOption { field: "aggregate sheet area exceeds u64" })
     ));
 }
+
+#[test]
+fn persisted_reuse_solution_keeps_replayable_forecast_provenance() {
+    let current = job(12, 8, 2, 8, 1);
+    let future = forecast(4, 8, 2, 1.0);
+    let limits = ReuseOptions2D { max_candidate_solves: 1, ..Default::default() };
+    let result = solve_2d_with_reuse(
+        current.problem,
+        TwoDOptions {
+            algorithm: TwoDAlgorithm::Guillotine,
+            multistart_runs: 1,
+            seed: Some(7),
+            ..Default::default()
+        },
+        &future,
+        &limits,
+    )
+    .expect("current solve and forecast");
+    let wire = serde_json::to_string(&result).expect("serialize indexed reuse result");
+    let restored: ReuseSolution2D =
+        serde_json::from_str(&wire).expect("restore indexed reuse result");
+    assert_eq!(restored, result);
+    let reevaluated = evaluate_reuse(&restored.job, &future, &limits)
+        .expect("persisted job independently validates and decomposes");
+    assert_eq!(reevaluated.fulfilled_counts, vec![2]);
+    assert_eq!(reevaluated, restored.evaluation);
+    assert_eq!(restored.job.stock_indices, vec![0]);
+    assert_eq!(restored.job.demand_indices, vec![vec![0]]);
+}

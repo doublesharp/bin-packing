@@ -351,3 +351,49 @@ fn experimental_boundaries_reject_aggregate_area_overflow_before_baseline() {
         ));
     }
 }
+
+#[test]
+fn opt_in_2d_searches_preserve_auto_ranking_with_kerf_caps_and_seeds() {
+    for seed in [0, 7, 17] {
+        for kerf in [0, 1] {
+            let mut current =
+                problem(12, 10, &[(4, 3, 3, true), (2, 5, 2, true), (3, 3, 1, false)]);
+            current.sheets[0].kerf = kerf;
+            current.sheets[0].edge_kerf_relief = kerf != 0;
+            current.sheets[0].quantity = Some(1);
+            let options = TwoDOptions {
+                seed: Some(seed),
+                beam_width: 4,
+                multistart_runs: 2,
+                auto_rotation_search_max_types: 1,
+                ..Default::default()
+            };
+            let baseline = solve_2d(current.clone(), options.clone()).expect("Auto baseline");
+            for solve in [
+                solve_2d_demand_aware,
+                solve_2d_mixed_rotations,
+                bin_packing::two_d::solve_2d_recombined,
+            ] {
+                let candidate = solve(current.clone(), options.clone()).expect("bounded search");
+                validate(&current, &candidate);
+                let ordering =
+                    (candidate.unplaced.len(), candidate.sheet_count, candidate.total_waste_area)
+                        .cmp(&(
+                            baseline.unplaced.len(),
+                            baseline.sheet_count,
+                            baseline.total_waste_area,
+                        ))
+                        .then_with(|| candidate.total_cost.total_cmp(&baseline.total_cost))
+                        .then_with(|| {
+                            baseline.max_usable_drop_area.cmp(&candidate.max_usable_drop_area)
+                        })
+                        .then_with(|| {
+                            baseline
+                                .total_sum_sq_usable_drop_areas
+                                .cmp(&candidate.total_sum_sq_usable_drop_areas)
+                        });
+                assert!(!ordering.is_gt(), "seed={seed} kerf={kerf}: {candidate:?}");
+            }
+        }
+    }
+}
