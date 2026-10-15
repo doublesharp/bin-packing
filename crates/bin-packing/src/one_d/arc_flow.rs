@@ -1,6 +1,6 @@
 //! Bounded multi-stock integer search over compressed pattern DAGs.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::mem::size_of;
 
 use super::model::{PackedBin, PieceInstance};
@@ -177,7 +177,6 @@ struct Arc {
 #[derive(Debug)]
 struct Node {
     demand: usize,
-    capacity: u32,
     arcs: Vec<Arc>,
 }
 
@@ -200,18 +199,17 @@ impl PatternDag {
             return None;
         }
         let capacity = stock.adjusted_capacity();
-        let mut nodes = vec![Node { demand: 0, capacity, arcs: Vec::new() }];
+        let mut nodes = vec![Node { demand: 0, arcs: Vec::new() }];
         stats.nodes += 1;
         let mut index = HashMap::from([((0, capacity), 0)]);
-        let mut cursor = 0;
-        while cursor < nodes.len() {
-            let demand_index = nodes[cursor].demand;
+        let mut pending = VecDeque::from([(0, capacity)]);
+        while let Some((demand_index, capacity)) = pending.pop_front() {
             if demand_index == problem.demands.len() {
-                cursor += 1;
                 continue;
             }
+            let node_index = *index.get(&(demand_index, capacity))?;
             let demand = &problem.demands[demand_index];
-            let capacity = nodes[cursor].capacity;
+            let mut arcs = Vec::new();
             let weight = demand.length.saturating_add(stock.kerf);
             let max_count = demand.quantity.min((capacity / weight) as usize);
             for count in (0..=max_count).rev() {
@@ -232,19 +230,17 @@ impl PatternDag {
                         return None;
                     }
                     let target = nodes.len();
-                    nodes.push(Node {
-                        demand: next_demand,
-                        capacity: next_capacity,
-                        arcs: Vec::new(),
-                    });
+                    nodes.push(Node { demand: next_demand, arcs: Vec::new() });
                     stats.nodes += 1;
-                    index.insert(key, target);
+                    let previous = index.insert(key, target);
+                    debug_assert!(previous.is_none());
+                    pending.push_back(key);
                     target
                 };
-                nodes[cursor].arcs.push(Arc { count, target });
+                arcs.push(Arc { count, target });
                 stats.arcs += 1;
             }
-            cursor += 1;
+            nodes.get_mut(node_index)?.arcs = arcs;
         }
         let mut paths = vec![0_u128; nodes.len()];
         for (index, node) in nodes.iter().enumerate().rev() {
