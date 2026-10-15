@@ -258,6 +258,12 @@ export interface SawSearchReport2D {
   explored_states: number;
   budget_exhausted: boolean;
   beam_pruned: boolean;
+  /** Equivalent future states rejected by operation-count dominance. */
+  dominated_states: number;
+  /** Peak dominance storage in scalar units, at most 65,536. */
+  peak_dominance_units: number;
+  /** Some moves bypassed a full cache without being discarded. */
+  dominance_table_saturated: boolean;
   optimality: SawOptimality2D;
   baseline_effort_score: number;
   baseline_counts: SawCounts2D;

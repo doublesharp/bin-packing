@@ -61,6 +61,11 @@ function smoke(api) {
   assert.equal(typeof plan.search.baseline_states, 'number');
   assert.equal(typeof plan.search.budget_exhausted, 'boolean');
   assert.equal(typeof plan.search.beam_pruned, 'boolean');
+  assert.ok(Number.isSafeInteger(plan.search.dominated_states));
+  assert.ok(plan.search.dominated_states >= 0);
+  assert.ok(Number.isSafeInteger(plan.search.peak_dominance_units));
+  assert.ok(plan.search.peak_dominance_units >= 0 && plan.search.peak_dominance_units <= 65536);
+  assert.equal(typeof plan.search.dominance_table_saturated, 'boolean');
   assert.ok(['heuristic', 'optimal_within_candidate_model'].includes(plan.search.optimality));
   assert.equal(typeof plan.search.baseline_effort_score, 'number');
   assert.equal(plan.search.baseline_counts.cuts, 3);
