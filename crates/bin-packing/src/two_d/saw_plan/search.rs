@@ -87,8 +87,14 @@ struct DominanceTable {
 }
 
 impl DominanceTable {
-    // Per-depth lookup costs O(log K + F), plus O(P) key construction. K keys
-    // and Pareto-front count vectors consume at most 65,536 scalar storage units.
+    // For R ready pieces and D total descriptor/part-index units, key construction
+    // copies O(D) units and sorts in O(R log R * C), where C bounds one ready-piece
+    // descriptor comparison. Tree lookup/insertion costs O(D log K + F) for K keys
+    // and an F-entry Pareto front; inserting a new key also copies O(D) units.
+    // After admission, the caller filters S retained successors in O(S * D) key
+    // comparison work. These costs include variable-sized keys, not just counts.
+    // Keys and Pareto fronts consume at most 65,536 scalar storage units, excluding
+    // allocator overhead, traces, beam storage and the separate geometry cache.
     // Once full, uncached moves remain eligible: memory pressure never discards a state.
     fn admit(&mut self, key: &FutureKey, counts: SawCounts2D) -> bool {
         if let Some(front) = self.entries.get_mut(key) {

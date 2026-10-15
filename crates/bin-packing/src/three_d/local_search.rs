@@ -142,6 +142,12 @@ pub(super) fn improve(
 
 /// Seeded bounded destroy-and-repair. `exploratory` can retain neutral
 /// rearrangements; only strict improvements replace the separate incumbent.
+///
+/// Neighborhood caps bound EP probes, not whole-input work. Selecting destinations
+/// allocates/scans O(B) bin indices per attempt. A successful repack builds a full
+/// solution snapshot, copying O(N + L) placement/label data and sorting B layouts
+/// with name comparisons, for N items and L total label bytes. Accepted replacements
+/// move into exploratory state; unchanged working items are never cloned per trial.
 pub(super) fn repair_target_bins(
     initial: ThreeDSolution,
     problem: &ThreeDProblem,
@@ -257,25 +263,33 @@ pub(super) fn repair_target_bins(
         let Some(rebuilt) = rebuilt else {
             continue;
         };
-        let mut trial = exploratory.clone();
-        trial.bins = trial
+        let rebuilt: Vec<_> = rebuilt.into_iter().filter(|bin| !bin.items.is_empty()).collect();
+        // Borrow unchanged bins for the ordinary builder. Keeping its layout sort
+        // and cost summation order preserves floating-point comparison semantics.
+        let bins = exploratory
             .bins
-            .into_iter()
+            .iter()
             .enumerate()
             .filter_map(|(i, bin)| (!selected.contains(&i)).then_some(bin))
-            .collect();
-        trial.bins.extend(rebuilt.into_iter().filter(|bin| !bin.items.is_empty()));
-        let Some(candidate) = trial.to_solution(problem) else {
+            .chain(&rebuilt);
+        let Some(candidate) = exploratory.solution_from_bins(problem, bins) else {
             continue;
         };
         if candidate.is_better_than(&best) {
             best = candidate;
             best.algorithm = "joint_repair".into();
-            exploratory = trial;
         } else if !best.is_better_than(&candidate) {
             neutral_rearrangements = neutral_rearrangements.saturating_add(1);
-            exploratory = trial;
+        } else {
+            continue;
         }
+        let mut index = 0;
+        exploratory.bins.retain(|_| {
+            let keep = !selected.contains(&index);
+            index += 1;
+            keep
+        });
+        exploratory.bins.extend(rebuilt);
     }
     metrics.iterations = metrics.iterations.saturating_add(attempts);
     metrics.explored_states = metrics.explored_states.saturating_add(placement_calls);
@@ -466,9 +480,17 @@ impl WorkingState {
     /// state via [`build_solution`]. Returns `None` if
     /// `build_solution` fails.
     fn to_solution(&self, problem: &ThreeDProblem) -> Option<ThreeDSolution> {
-        let bin_placements: Vec<(usize, Vec<Placement3D>)> = self
-            .bins
-            .iter()
+        self.solution_from_bins(problem, self.bins.iter())
+    }
+
+    /// Build from borrowed bins, including tentative replacements, without copying
+    /// the working state. All objective aggregation remains in the shared builder.
+    fn solution_from_bins<'a>(
+        &self,
+        problem: &ThreeDProblem,
+        bins: impl Iterator<Item = &'a WorkingBin>,
+    ) -> Option<ThreeDSolution> {
+        let bin_placements: Vec<(usize, Vec<Placement3D>)> = bins
             .map(|bin| (bin.bin_index, bin.items.iter().map(|it| it.placement.clone()).collect()))
             .collect();
         let unplaced_items = self.unplaced.iter().map(box_demand_to_instance).collect();
@@ -984,6 +1006,44 @@ mod tests {
                 quantity: 3,
                 allowed_rotations: RotationMask3D::XYZ,
             }],
+        }
+    }
+
+    #[test]
+    fn joint_repair_many_bin_neutral_trials_preserve_incumbent_and_cost_bits() {
+        let mut problem = multi_bin_problem();
+        problem.bins[0].name = format!("a-{}", "stock".repeat(800));
+        problem.bins[0].cost = 0.1;
+        problem.bins[0].quantity = Some(64);
+        let mut second = problem.bins[0].clone();
+        second.name = format!("b-{}", "stock".repeat(800));
+        second.cost = 0.2;
+        problem.bins.push(second);
+        problem.demands[0].name = "demand".repeat(700);
+        problem.demands[0].quantity = 128;
+        let options = ThreeDOptions {
+            algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+            multistart_runs: 2,
+            improvement_rounds: 4,
+            seed: Some(7),
+            ..ThreeDOptions::default()
+        };
+        let baseline = crate::three_d::solve_3d(problem.clone(), options.clone()).expect("seed");
+        assert_eq!(baseline.bin_count, 128);
+        for _ in 0..3 {
+            let started = std::time::Instant::now();
+            let repaired = repair_target_bins(baseline.clone(), &problem, &options);
+            eprintln!("many-bin neutral repair: {:?}", started.elapsed());
+            assert_eq!(repaired.layouts, baseline.layouts);
+            assert_eq!(repaired.total_cost.to_bits(), baseline.total_cost.to_bits());
+            assert!(
+                repaired
+                    .metrics
+                    .notes
+                    .iter()
+                    .any(|note| { note.contains("neutral_rearrangements=8,") })
+            );
+            assert_joint_geometry(&problem, &repaired);
         }
     }
 
