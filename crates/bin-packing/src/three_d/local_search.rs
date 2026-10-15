@@ -28,12 +28,13 @@
 
 use std::collections::BTreeSet;
 
-use rand::{SeedableRng, rngs::SmallRng};
+use rand::{SeedableRng, rngs::SmallRng, seq::SliceRandom};
 
 use super::common::{build_solution, placement_feasible, placements_overlap, volume_u64};
+use super::extreme_points::{BinState, ExtremePointsScoring, try_place_into_bin};
 use super::model::{
-    Bin3D, BoxDemand3D, Placement3D, Rotation3D, RotationMask3D, SolverMetrics3D, ThreeDOptions,
-    ThreeDProblem, ThreeDSolution,
+    Bin3D, BoxDemand3D, ItemInstance3D, Placement3D, Rotation3D, RotationMask3D, SolverMetrics3D,
+    ThreeDOptions, ThreeDProblem, ThreeDSolution,
 };
 use super::sorted::solve_first_fit_decreasing_volume;
 use crate::Result;
@@ -139,11 +140,221 @@ pub(super) fn improve(
     out
 }
 
+/// Seeded bounded destroy-and-repair. `exploratory` can retain neutral
+/// rearrangements; only strict improvements replace the separate incumbent.
+pub(super) fn repair_target_bins(
+    initial: ThreeDSolution,
+    problem: &ThreeDProblem,
+    options: &ThreeDOptions,
+) -> ThreeDSolution {
+    if options.guillotine_required || initial.bin_count < 2 || options.improvement_rounds == 0 {
+        return initial;
+    }
+    let Some(mut exploratory) = WorkingState::for_repair(&initial, problem) else {
+        return initial;
+    };
+    let mut metrics = initial.metrics.clone();
+    let mut best = initial;
+    let budget =
+        options.multistart_runs.clamp(1, 32).saturating_mul(options.improvement_rounds.min(32));
+    let mut rng = SmallRng::seed_from_u64(options.seed.unwrap_or(DEFAULT_SEED));
+    // Borrow these immutable demand records throughout the trials. Item names
+    // are cloned once per demand, rather than per placement probe.
+    let instances: Vec<_> = problem
+        .demands
+        .iter()
+        .enumerate()
+        .map(|(demand_index, demand)| ItemInstance3D {
+            demand_index,
+            name: demand.name.clone(),
+            width: demand.width,
+            height: demand.height,
+            depth: demand.depth,
+            allowed_rotations: demand.allowed_rotations,
+        })
+        .collect();
+    let mut attempts = 0usize;
+    let mut neutral_rearrangements = 0usize;
+    let mut placement_calls = 0usize;
+    for attempt in 0..budget {
+        if exploratory.bins.len() < 2 {
+            break;
+        }
+        let target = if attempt == 0 {
+            exploratory
+                .bins
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, bin)| {
+                    bin.items
+                        .iter()
+                        .map(|item| volume_u64(item.original_w, item.original_h, item.original_d))
+                        .sum::<u64>()
+                })
+                .map(|(index, _)| index)
+                .unwrap_or(0)
+        } else {
+            attempt % exploratory.bins.len()
+        };
+        let mut selected: Vec<_> = (0..exploratory.bins.len()).filter(|&i| i != target).collect();
+        if attempt > 0 {
+            selected.shuffle(&mut rng);
+        }
+        selected.truncate(3);
+        selected.push(target);
+        let item_count = selected.iter().map(|&i| exploratory.bins[i].items.len()).sum::<usize>();
+        if item_count > 48 {
+            continue;
+        }
+        attempts = attempts.saturating_add(1);
+        let pool: Vec<_> =
+            selected.iter().flat_map(|&i| exploratory.bins[i].items.iter()).collect();
+        let mut order: Vec<_> = (0..pool.len()).collect();
+        if attempt == 0 {
+            order.sort_by_key(|&i| {
+                std::cmp::Reverse(volume_u64(
+                    pool[i].original_w,
+                    pool[i].original_h,
+                    pool[i].original_d,
+                ))
+            });
+        } else {
+            order.shuffle(&mut rng);
+        }
+        let stock_indices: Vec<_> =
+            selected.iter().map(|&i| exploratory.bins[i].bin_index).collect();
+        let scores = [
+            ExtremePointsScoring::VolumeFitResidual,
+            ExtremePointsScoring::ContactPoint,
+            ExtremePointsScoring::ResidualSpace,
+            ExtremePointsScoring::BottomLeftBack,
+            ExtremePointsScoring::FreeVolume,
+            ExtremePointsScoring::Euclidean,
+        ];
+        let scoring = scores[attempt % scores.len()];
+        let eliminated = repack_joint(
+            &pool,
+            &instances,
+            &order,
+            &stock_indices[..stock_indices.len() - 1],
+            problem,
+            scoring,
+            &mut placement_calls,
+        );
+        // A failed elimination may still produce a useful neutral configuration
+        // with the original bin count. Its contents feed the next neighborhood.
+        let rebuilt = eliminated.or_else(|| {
+            repack_joint(
+                &pool,
+                &instances,
+                &order,
+                &stock_indices,
+                problem,
+                scoring,
+                &mut placement_calls,
+            )
+        });
+        let Some(rebuilt) = rebuilt else {
+            continue;
+        };
+        let mut trial = exploratory.clone();
+        trial.bins = trial
+            .bins
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, bin)| (!selected.contains(&i)).then_some(bin))
+            .collect();
+        trial.bins.extend(rebuilt.into_iter().filter(|bin| !bin.items.is_empty()));
+        let Some(candidate) = trial.to_solution(problem) else {
+            continue;
+        };
+        if candidate.is_better_than(&best) {
+            best = candidate;
+            best.algorithm = "joint_repair".into();
+            exploratory = trial;
+        } else if !best.is_better_than(&candidate) {
+            neutral_rearrangements = neutral_rearrangements.saturating_add(1);
+            exploratory = trial;
+        }
+    }
+    metrics.iterations = metrics.iterations.saturating_add(attempts);
+    metrics.explored_states = metrics.explored_states.saturating_add(placement_calls);
+    metrics.notes.push(format!(
+        "joint_repair: attempts={attempts}, budget={budget}, \
+        neutral_rearrangements={neutral_rearrangements}, placement_calls={placement_calls}, \
+        max_items=48, max_bins=4"
+    ));
+    best.metrics = metrics;
+    best
+}
+
+/// Greedy joint repack into an existing stock multiset. No stock is opened.
+/// O(items * bins) EP calls; caps at the caller bound each EP geometry scan.
+fn repack_joint(
+    pool: &[&WorkingItem],
+    instances: &[ItemInstance3D],
+    order: &[usize],
+    stock_indices: &[usize],
+    problem: &ThreeDProblem,
+    scoring: ExtremePointsScoring,
+    placement_calls: &mut usize,
+) -> Option<Vec<WorkingBin>> {
+    let mut states: Vec<_> = stock_indices.iter().map(|&index| BinState::new(index)).collect();
+    let mut assigned: Vec<Vec<usize>> = stock_indices.iter().map(|_| Vec::new()).collect();
+    for &index in order {
+        let mut installed = false;
+        for (state, assignment) in states.iter_mut().zip(&mut assigned) {
+            *placement_calls = placement_calls.saturating_add(1);
+            if try_place_into_bin(
+                state,
+                &problem.bins[state.bin_index],
+                &instances[pool[index].demand_index],
+                scoring,
+            )
+            .is_some()
+            {
+                assignment.push(index);
+                installed = true;
+                break;
+            }
+        }
+        if !installed {
+            return None;
+        }
+    }
+    let bins = states
+        .into_iter()
+        .zip(assigned)
+        .map(|(state, assignment)| WorkingBin {
+            bin_index: state.bin_index,
+            items: state
+                .placements
+                .into_iter()
+                .zip(assignment)
+                .map(|(placement, index)| {
+                    let item = pool[index];
+                    WorkingItem {
+                        demand_index: item.demand_index,
+                        name: item.name.clone(),
+                        original_w: item.original_w,
+                        original_h: item.original_h,
+                        original_d: item.original_d,
+                        allowed_rotations: item.allowed_rotations,
+                        placement,
+                    }
+                })
+                .collect(),
+        })
+        .collect();
+    Some(bins)
+}
+
 /// A placed item inside a working bin. Carries the original
 /// (un-rotated) demand dimensions and rotation mask so the
 /// neighbourhood can try alternate rotations.
 #[derive(Debug, Clone)]
 struct WorkingItem {
+    demand_index: usize,
     name: String,
     /// Declared width of the originating demand (not yet rotated).
     original_w: u32,
@@ -197,9 +408,33 @@ impl WorkingState {
     /// `None` if any layout bin-name or placement name cannot be
     /// resolved against `problem`.
     fn from_solution(solution: &ThreeDSolution, problem: &ThreeDProblem) -> Option<Self> {
+        let remaining = problem.demands.iter().map(|demand| demand.quantity).collect();
+        Self::from_remaining(solution, problem, remaining)
+    }
+
+    /// Reserve exact unplaced demand records before matching ambiguous names.
+    /// Failure leaves the incumbent untouched; no identity is guessed.
+    fn for_repair(solution: &ThreeDSolution, problem: &ThreeDProblem) -> Option<Self> {
+        let mut remaining: Vec<_> = problem.demands.iter().map(|demand| demand.quantity).collect();
+        for unplaced in &solution.unplaced {
+            let index = problem.demands.iter().enumerate().position(|(i, demand)| {
+                remaining[i] >= unplaced.quantity
+                    && demand.name == unplaced.name
+                    && (demand.width, demand.height, demand.depth)
+                        == (unplaced.width, unplaced.height, unplaced.depth)
+                    && demand.allowed_rotations == unplaced.allowed_rotations
+            })?;
+            remaining[index] -= unplaced.quantity;
+        }
+        Self::from_remaining(solution, problem, remaining)
+    }
+
+    fn from_remaining(
+        solution: &ThreeDSolution,
+        problem: &ThreeDProblem,
+        mut remaining_by_demand: Vec<usize>,
+    ) -> Option<Self> {
         let mut bins: Vec<WorkingBin> = Vec::with_capacity(solution.layouts.len());
-        let mut remaining_by_demand: Vec<usize> =
-            problem.demands.iter().map(|demand| demand.quantity).collect();
         for layout in &solution.layouts {
             let bin_index = problem.bins.iter().position(|bin| bin.name == layout.bin_name)?;
             let mut items: Vec<WorkingItem> = Vec::with_capacity(layout.placements.len());
@@ -213,6 +448,7 @@ impl WorkingState {
                     remaining_by_demand[demand_index].saturating_sub(1);
                 let demand = &problem.demands[demand_index];
                 items.push(WorkingItem {
+                    demand_index,
                     name: placement.name.clone(),
                     original_w: demand.width,
                     original_h: demand.height,
@@ -269,7 +505,7 @@ fn placement_matches_demand(placement: &Placement3D, demand: &BoxDemand3D) -> bo
 }
 
 /// Translate a [`BoxDemand3D`] back into an
-/// [`ItemInstance3D`](super::model::ItemInstance3D) for
+/// [`ItemInstance3D`] for
 /// `build_solution`'s unplaced-list input.
 fn box_demand_to_instance(demand: &BoxDemand3D) -> super::model::ItemInstance3D {
     super::model::ItemInstance3D {
@@ -556,6 +792,7 @@ fn try_apply_swap(
             }
             let mut trial = working.clone();
             trial.bins[bin_a].items[ia] = WorkingItem {
+                demand_index: item_b.demand_index,
                 name: item_b.name.clone(),
                 original_w: item_b.original_w,
                 original_h: item_b.original_h,
@@ -564,6 +801,7 @@ fn try_apply_swap(
                 placement: new_a,
             };
             trial.bins[bin_b].items[ib] = WorkingItem {
+                demand_index: item_a.demand_index,
                 name: item_a.name.clone(),
                 original_w: item_a.original_w,
                 original_h: item_a.original_h,
@@ -676,6 +914,7 @@ fn relocate_item_into_any_other_bin(
                         rotation,
                     };
                     working.bins[dst_bin].items.push(WorkingItem {
+                        demand_index: item.demand_index,
                         name: item.name.clone(),
                         original_w: item.original_w,
                         original_h: item.original_h,
@@ -745,6 +984,340 @@ mod tests {
                 quantity: 3,
                 allowed_rotations: RotationMask3D::XYZ,
             }],
+        }
+    }
+
+    #[test]
+    fn joint_repair_eliminates_a_bin_after_repacking_destinations() {
+        let problem = joint_repair_problem();
+        let options = options_with_seed(7);
+        let baseline = solve_local_search(&problem, &options).expect("baseline");
+        assert_eq!(baseline.bin_count, 3, "frozen destinations leave one unit each");
+        let first_only =
+            ThreeDOptions { multistart_runs: 1, improvement_rounds: 1, ..options.clone() };
+        let first =
+            crate::three_d::solve_3d_repaired(problem.clone(), first_only).expect("first attempt");
+        assert_eq!(first.bin_count, 3, "one sorted reconstruction stays trapped");
+        let repaired = crate::three_d::solve_3d_repaired(problem.clone(), options).expect("repair");
+        assert_eq!(repaired.bin_count, 2, "joint repair must rebuild 6+2+2 and 5+3+2");
+        assert_joint_geometry(&problem, &repaired);
+    }
+
+    #[test]
+    fn joint_repair_seeded_diversification_and_non_regression() {
+        let problem = joint_repair_problem();
+        let mut layouts = BTreeSet::new();
+        for seed in 0..16 {
+            let options = ThreeDOptions {
+                algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+                multistart_runs: 4,
+                improvement_rounds: 8,
+                seed: Some(seed),
+                ..ThreeDOptions::default()
+            };
+            let baseline =
+                crate::three_d::solve_3d(problem.clone(), options.clone()).expect("seed");
+            let repaired = crate::three_d::solve_3d_repaired(problem.clone(), options.clone())
+                .expect("repair");
+            assert!(!baseline.is_better_than(&repaired));
+            assert_eq!(repaired.bin_count, 2);
+            assert_joint_geometry(&problem, &repaired);
+            assert_eq!(
+                repaired,
+                crate::three_d::solve_3d_repaired(problem.clone(), options).expect("repeat")
+            );
+            assert!(
+                repaired.metrics.explored_states
+                    <= baseline.metrics.explored_states + 32 * 2 * 48 * 4
+            );
+            layouts.extend([serde_json::to_string(&repaired.layouts).expect("layouts")]);
+        }
+        assert!(layouts.len() > 1, "different seeds must explore distinct feasible layouts");
+    }
+
+    #[test]
+    fn joint_repair_work_cap_and_zero_rounds() {
+        let problem = joint_repair_problem();
+        let options = ThreeDOptions {
+            algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+            multistart_runs: usize::MAX,
+            improvement_rounds: usize::MAX,
+            seed: Some(7),
+            ..ThreeDOptions::default()
+        };
+        let baseline = crate::three_d::solve_3d(problem.clone(), options.clone()).expect("seed");
+        let repaired =
+            crate::three_d::solve_3d_repaired(problem.clone(), options.clone()).expect("repair");
+        assert!(
+            repaired.metrics.explored_states
+                <= baseline.metrics.explored_states + 1024 * 2 * 48 * 4
+        );
+        assert!(repaired.metrics.iterations <= baseline.metrics.iterations + 1024);
+        assert_joint_geometry(&problem, &repaired);
+        let zero = ThreeDOptions { improvement_rounds: 0, ..options };
+        assert_eq!(
+            crate::three_d::solve_3d_repaired(problem.clone(), zero.clone()).expect("disabled"),
+            crate::three_d::solve_3d(problem, zero).expect("seed")
+        );
+    }
+
+    #[test]
+    fn joint_repair_preserves_rotation_masks_and_inventory_summaries() {
+        let mut problem = joint_repair_problem();
+        problem.bins[0].quantity = Some(3);
+        for demand in &mut problem.demands {
+            demand.height = demand.width;
+            demand.width = 1;
+            demand.allowed_rotations = RotationMask3D::YXZ;
+        }
+        let options = ThreeDOptions {
+            algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+            seed: Some(7),
+            multistart_runs: 4,
+            improvement_rounds: 8,
+            ..ThreeDOptions::default()
+        };
+        let repaired = crate::three_d::solve_3d_repaired(problem.clone(), options).expect("repair");
+        assert_eq!(repaired.bin_count, 2);
+        assert_joint_geometry(&problem, &repaired);
+        assert_eq!(repaired.bin_requirements.len(), 1);
+        assert_eq!(repaired.bin_requirements[0].used_quantity, 2);
+        assert_eq!(repaired.bin_requirements[0].available_quantity, Some(3));
+    }
+
+    #[test]
+    fn joint_repair_skips_guillotine_required_and_large_neighborhoods() {
+        let problem = joint_repair_problem();
+        let options = ThreeDOptions {
+            guillotine_required: true,
+            multistart_runs: 1,
+            improvement_rounds: 1,
+            ..ThreeDOptions::default()
+        };
+        let baseline = crate::three_d::solve_3d(problem.clone(), options.clone()).expect("seed");
+        assert!(baseline.guillotine);
+        assert_eq!(baseline, crate::three_d::solve_3d_repaired(problem, options).expect("skip"));
+        let mut large = multi_bin_problem();
+        large.bins[0].width = 200;
+        large.demands[0].quantity = 80;
+        let options = ThreeDOptions {
+            algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+            multistart_runs: 1,
+            improvement_rounds: 1,
+            ..ThreeDOptions::default()
+        };
+        let baseline = crate::three_d::solve_3d(large.clone(), options.clone()).expect("seed");
+        let repaired =
+            crate::three_d::solve_3d_repaired(large.clone(), options).expect("skip large");
+        assert_eq!(baseline.layouts, repaired.layouts);
+        assert_eq!(baseline.metrics.explored_states, repaired.metrics.explored_states);
+        assert_joint_geometry(&large, &repaired);
+    }
+
+    #[test]
+    fn joint_repair_validates_and_preserves_unplaced_demand() {
+        let mut problem = joint_repair_problem();
+        problem.bins[0].quantity = Some(1);
+        let options = ThreeDOptions {
+            algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+            ..ThreeDOptions::default()
+        };
+        let baseline = crate::three_d::solve_3d(problem.clone(), options.clone()).expect("seed");
+        assert!(!baseline.unplaced.is_empty());
+        assert_eq!(
+            baseline,
+            crate::three_d::solve_3d_repaired(problem.clone(), options.clone()).expect("repair")
+        );
+        problem.bins[0].width = 0;
+        assert!(matches!(
+            crate::three_d::solve_3d_repaired(problem, options),
+            Err(crate::BinPackingError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
+    fn joint_repair_mixed_three_dimensional_geometry() {
+        for rotations in [RotationMask3D::XYZ, RotationMask3D::ALL] {
+            for seed in 0..8 {
+                let problem = ThreeDProblem {
+                    bins: vec![
+                        Bin3D {
+                            name: "stock_a".into(),
+                            width: 9,
+                            height: 8,
+                            depth: 7,
+                            cost: 1.2,
+                            quantity: Some(8),
+                        },
+                        Bin3D {
+                            name: "stock_b".into(),
+                            width: 7,
+                            height: 9,
+                            depth: 8,
+                            cost: 0.8,
+                            quantity: Some(8),
+                        },
+                    ],
+                    demands: [(6, 3, 2), (2, 5, 4), (4, 3, 3), (3, 2, 6), (2, 2, 2)]
+                        .into_iter()
+                        .map(|(width, height, depth)| BoxDemand3D {
+                            name: "same".into(),
+                            width,
+                            height,
+                            depth,
+                            quantity: 2,
+                            allowed_rotations: rotations,
+                        })
+                        .collect(),
+                };
+                let options = ThreeDOptions {
+                    algorithm: ThreeDAlgorithm::FirstFitDecreasingVolume,
+                    multistart_runs: 2,
+                    improvement_rounds: 4,
+                    seed: Some(seed),
+                    ..ThreeDOptions::default()
+                };
+                let baseline =
+                    crate::three_d::solve_3d(problem.clone(), options.clone()).expect("seed");
+                let repaired =
+                    crate::three_d::solve_3d_repaired(problem.clone(), options).expect("repair");
+                assert!(!baseline.is_better_than(&repaired));
+                assert_joint_geometry(&problem, &repaired);
+            }
+        }
+    }
+
+    #[test]
+    fn joint_repair_reserves_duplicate_name_unplaced_identity() {
+        let mut problem = trivial_problem();
+        problem.demands[0].name = "same".into();
+        problem.demands[0].width = 1;
+        problem.demands[0].height = 1;
+        problem.demands[0].depth = 1;
+        problem.demands[0].allowed_rotations = RotationMask3D::XYZ;
+        let strict = problem.demands[0].clone();
+        let mut flexible = strict.clone();
+        flexible.allowed_rotations = RotationMask3D::ALL;
+        flexible.quantity = 2;
+        problem.demands.push(flexible);
+        let placement = Placement3D {
+            name: "same".into(),
+            x: 0,
+            y: 0,
+            z: 0,
+            width: 1,
+            height: 1,
+            depth: 1,
+            rotation: Rotation3D::Xyz,
+        };
+        let initial = build_solution(
+            "fixture",
+            &problem.bins,
+            vec![(0, vec![placement.clone()]), (0, vec![placement])],
+            vec![box_demand_to_instance(&strict)],
+            SolverMetrics3D::default(),
+            false,
+        )
+        .expect("fixture");
+        let working = WorkingState::for_repair(&initial, &problem).expect("decompose");
+        assert!(
+            working.bins.iter().flat_map(|bin| &bin.items).all(|item| item.demand_index == 1),
+            "the sole strict demand is already represented by unplaced"
+        );
+    }
+
+    #[test]
+    fn joint_repair_measurement() {
+        let problem = joint_repair_problem();
+        let options = options_with_seed(7);
+        let start = std::time::Instant::now();
+        let baseline =
+            crate::three_d::solve_3d(problem.clone(), options.clone()).expect("baseline");
+        let baseline_us = start.elapsed().as_micros();
+        let start = std::time::Instant::now();
+        let repaired = crate::three_d::solve_3d_repaired(problem.clone(), options).expect("repair");
+        eprintln!(
+            "joint repair bins {}->{} baseline_us={} repaired_us={} notes={:?}",
+            baseline.bin_count,
+            repaired.bin_count,
+            baseline_us,
+            start.elapsed().as_micros(),
+            repaired.metrics.notes
+        );
+        assert_eq!((baseline.bin_count, repaired.bin_count), (3, 2));
+        assert_joint_geometry(&problem, &repaired);
+    }
+
+    fn joint_repair_problem() -> ThreeDProblem {
+        ThreeDProblem {
+            bins: vec![Bin3D {
+                name: "strip".into(),
+                width: 10,
+                height: 1,
+                depth: 1,
+                cost: 1.0,
+                quantity: None,
+            }],
+            // Repeated names with different dimensions must retain demand identity.
+            demands: [6, 5, 3, 2]
+                .into_iter()
+                .map(|width| BoxDemand3D {
+                    name: "same".into(),
+                    width,
+                    height: 1,
+                    depth: 1,
+                    quantity: if width == 2 { 3 } else { 1 },
+                    allowed_rotations: RotationMask3D::XYZ,
+                })
+                .collect(),
+        }
+    }
+
+    fn assert_joint_geometry(problem: &ThreeDProblem, solution: &ThreeDSolution) {
+        assert!(solution.unplaced.is_empty());
+        let mut remaining: Vec<_> = problem.demands.iter().map(|d| d.quantity).collect();
+        let mut inventory = vec![0usize; problem.bins.len()];
+        for layout in &solution.layouts {
+            let bin_index =
+                problem.bins.iter().position(|b| b.name == layout.bin_name).expect("known bin");
+            let bin = &problem.bins[bin_index];
+            inventory[bin_index] += 1;
+            assert_eq!(
+                (layout.width, layout.height, layout.depth),
+                (bin.width, bin.height, bin.depth)
+            );
+            for (i, p) in layout.placements.iter().enumerate() {
+                let demand_index = problem
+                    .demands
+                    .iter()
+                    .enumerate()
+                    .position(|(j, d)| {
+                        remaining[j] > 0
+                            && d.name == p.name
+                            && d.allowed_rotations.contains(p.rotation)
+                            && p.rotation.apply(d.width, d.height, d.depth)
+                                == (p.width, p.height, p.depth)
+                    })
+                    .expect("distinct remaining demand instance");
+                remaining[demand_index] -= 1;
+                assert!(u64::from(p.x) + u64::from(p.width) <= u64::from(bin.width));
+                assert!(u64::from(p.y) + u64::from(p.height) <= u64::from(bin.height));
+                assert!(u64::from(p.z) + u64::from(p.depth) <= u64::from(bin.depth));
+                for q in &layout.placements[..i] {
+                    assert!(
+                        p.x + p.width <= q.x
+                            || q.x + q.width <= p.x
+                            || p.y + p.height <= q.y
+                            || q.y + q.height <= p.y
+                            || p.z + p.depth <= q.z
+                            || q.z + q.depth <= p.z
+                    );
+                }
+            }
+        }
+        assert!(remaining.iter().all(|&q| q == 0));
+        for (bin, used) in problem.bins.iter().zip(inventory) {
+            assert!(bin.quantity.is_none_or(|available| used <= available));
         }
     }
 
