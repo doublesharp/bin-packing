@@ -7,6 +7,7 @@ use crate::{BinPackingError, Result};
 
 const MAX_TYPES: usize = 16;
 const MAX_ITEMS: usize = 96;
+const MAX_FALLBACK_ITEMS: usize = 128;
 const MAX_PATTERNS: usize = 256;
 const MAX_STATES: usize = 25_000;
 
@@ -19,17 +20,41 @@ const MAX_STATES: usize = 25_000;
 ///
 /// Recombination is limited to 16 demand types, 16 stock types, 96 pieces,
 /// 256 distinct patterns, and at most 25,000 search states. The state budget is
-/// `min(max(beam_width, 1) * 512, 25_000)`. Larger inputs use ordinary Auto.
+/// `min(max(beam_width, 1) * 512, 25_000)`. Inputs exceeding the recombination
+/// limits use ordinary Auto, up to a hard public limit of 128 pieces. Inputs
+/// whose largest stock area times piece count exceeds `u64::MAX` are rejected
+/// before any packing or expansion. The state memo is disabled unless every
+/// possible cost sum is an exactly representable integer in `f64`, because
+/// layout sorting can otherwise change the cost. Metrics report the memo mode.
+/// Both `beam_width` and `multistart_runs` must be at most 32, including fallback.
 /// A restricted pattern pool does not prove global optimality.
 ///
 /// # Errors
 ///
 /// Returns the same input-validation and infeasible-demand errors as
-/// [`super::solve_2d`], or the last portfolio error if no solver succeeds.
+/// [`super::solve_2d`], [`BinPackingError::Unsupported`] for the public piece or
+/// aggregate-area or work-control bounds, or the last portfolio error if no solver succeeds.
 pub fn solve_2d_recombined(problem: TwoDProblem, options: TwoDOptions) -> Result<TwoDSolution> {
     problem.validate()?;
     problem.ensure_feasible_demands()?;
+    if options.beam_width > 32 || options.multistart_runs > 32 {
+        return Err(BinPackingError::Unsupported(
+            "pattern recombination requires beam width and multistart runs at most 32".into(),
+        ));
+    }
     let total = problem.demands.iter().map(|d| d.quantity).sum::<usize>();
+    if total > MAX_FALLBACK_ITEMS {
+        return Err(BinPackingError::Unsupported(
+            "pattern recombination supports at most 128 pieces, including Auto fallback".into(),
+        ));
+    }
+    if problem.sheets.iter().any(|sheet| {
+        u128::from(sheet.width) * u128::from(sheet.height) * total as u128 > u128::from(u64::MAX)
+    }) {
+        return Err(BinPackingError::Unsupported(
+            "pattern recombination aggregate stock area exceeds u64::MAX".into(),
+        ));
+    }
     if problem.demands.len() > MAX_TYPES || problem.sheets.len() > MAX_TYPES || total > MAX_ITEMS {
         let mut solution =
             super::solve_2d(problem, TwoDOptions { algorithm: TwoDAlgorithm::Auto, ..options })?;
@@ -150,6 +175,7 @@ struct Search<'a> {
     patterns: Vec<Pattern>,
     best: TwoDSolution,
     seen: HashMap<Key, Vec<Prefix>>,
+    memo_enabled: bool,
     states: usize,
     limit: usize,
     exhausted: bool,
@@ -168,12 +194,21 @@ fn select_patterns(
     }
     let patterns = collect_patterns(problem, candidates);
     let pattern_count = patterns.len();
+    let total = problem.demands.iter().map(|d| d.quantity).sum::<usize>();
+    // Every selected pattern contains a piece, so total bounds the sheet count.
+    // Integer sums through 2^53 are exact regardless of layout sorting order.
+    let memo_enabled = problem.sheets.iter().all(|sheet| {
+        sheet.cost.fract() == 0.0
+            && sheet.cost <= (1_u64 << 53) as f64
+            && u128::from(sheet.cost as u64) * total as u128 <= (1_u128 << 53)
+    });
     let mut search = Search {
         problem,
         options,
         patterns,
         best,
         seen: HashMap::new(),
+        memo_enabled,
         states: 0,
         limit: options.beam_width.max(1).saturating_mul(512).min(MAX_STATES),
         exhausted: false,
@@ -188,8 +223,8 @@ fn select_patterns(
     search.best.metrics.explored_states =
         search.best.metrics.explored_states.saturating_add(search.states);
     search.best.metrics.notes.push(format!(
-        "pattern recombination: {pattern_count} patterns, {} states, budget_exhausted={}",
-        search.states, search.exhausted,
+        "pattern recombination: {pattern_count} patterns, {} states, budget_exhausted={}, memo_enabled={}",
+        search.states, search.exhausted, search.memo_enabled,
     ));
     Some(search.best)
 }
@@ -324,13 +359,15 @@ impl Search<'_> {
         if self.best.unplaced.is_empty() && path.len() >= self.best.sheet_count {
             return;
         }
-        let key = Key { remaining: remaining.to_vec(), usage: usage.to_vec() };
-        let prefixes = self.seen.entry(key).or_default();
-        if prefixes.iter().any(|&p| p.dominates(prefix)) {
-            return;
+        if self.memo_enabled {
+            let key = Key { remaining: remaining.to_vec(), usage: usage.to_vec() };
+            let prefixes = self.seen.entry(key).or_default();
+            if prefixes.iter().any(|&p| p.dominates(prefix)) {
+                return;
+            }
+            prefixes.retain(|&p| !prefix.dominates(p));
+            prefixes.push(prefix);
         }
-        prefixes.retain(|&p| !prefix.dominates(p));
-        prefixes.push(prefix);
         // This loop indexes immutable patterns; recursive updates affect only the
         // separate demand/usage vectors and the bounded search ledger.
         for index in 0..self.patterns.len() {
@@ -503,6 +540,166 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn public_boundary_rejects_excessive_cardinality_before_expansion() {
+        for quantity in [129, u32::MAX as usize] {
+            let mut input = problem();
+            input.demands.truncate(1);
+            input.demands[0].quantity = quantity;
+            assert!(matches!(
+                solve_2d_recombined(input, TwoDOptions::default()),
+                Err(BinPackingError::Unsupported(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn public_boundary_bounds_portfolio_work_before_seed_solve() {
+        for excessive in [33, usize::MAX] {
+            for options in [
+                TwoDOptions { multistart_runs: excessive, ..Default::default() },
+                TwoDOptions { beam_width: excessive, ..Default::default() },
+            ] {
+                assert!(matches!(
+                    solve_2d_recombined(problem(), options),
+                    Err(BinPackingError::Unsupported(_))
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn public_boundary_rejects_aggregate_area_overflow_before_seed_solve() {
+        let mut input = problem();
+        input.sheets[0].width = 1_000_000_000;
+        input.sheets[0].height = 1_000_000_000;
+        input.demands.truncate(1);
+        input.demands[0].width = 600_000_000;
+        input.demands[0].height = 600_000_000;
+        input.demands[0].quantity = 96;
+        assert!(matches!(
+            solve_2d_recombined(input, TwoDOptions::default()),
+            Err(BinPackingError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn moderate_inputs_keep_ordinary_auto_fallback() {
+        let mut input = problem();
+        input.demands.truncate(1);
+        input.demands[0].width = 1;
+        input.demands[0].height = 1;
+        input.demands[0].quantity = 97;
+        let options = TwoDOptions { multistart_runs: 1, seed: Some(7), ..Default::default() };
+        let baseline = super::super::solve_2d(input.clone(), options.clone()).expect("Auto");
+        let mut result = solve_2d_recombined(input, options).expect("bounded fallback");
+        assert_eq!(
+            result.metrics.notes.pop().as_deref(),
+            Some("pattern recombination skipped: input cap")
+        );
+        assert_eq!(result, baseline);
+    }
+
+    #[test]
+    fn order_sensitive_costs_match_exhaustive_tiny_pattern_selection() {
+        for costs in [[0.1, 0.2, 0.3, 0.0], [1.0, 1.0, (1_u64 << 53) as f64, 0.0]] {
+            let input = TwoDProblem {
+                sheets: costs
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &cost)| Sheet2D {
+                        name: format!("stock-{i}"),
+                        width: 10,
+                        height: 1,
+                        cost,
+                        quantity: Some(1),
+                        kerf: 0,
+                        edge_kerf_relief: false,
+                    })
+                    .collect(),
+                demands: (0..5)
+                    .map(|i| RectDemand2D {
+                        name: i.to_string(),
+                        width: 1,
+                        height: 1,
+                        quantity: if i == 4 { 6 } else { 1 },
+                        can_rotate: false,
+                    })
+                    .collect(),
+            };
+            let layout = |stock: usize, common: usize| {
+                let mut placements = vec![placement(&stock.to_string(), 0, 0, 1, 1)];
+                placements.extend((0..common).map(|i| placement("4", i as u32 + 1, 0, 1, 1)));
+                (stock, placements)
+            };
+            // Every parent is a valid partial packing. Its patterns supply one
+            // stock-specific marker and one to three common pieces.
+            let mut parents = Vec::new();
+            for stock in 0..4 {
+                for common in if stock == 3 { 0..=0 } else { 1..=3 } {
+                    let mut leftover = input.clone();
+                    leftover.demands[stock].quantity = 0;
+                    leftover.demands[4].quantity -= common;
+                    parents.push(TwoDSolution::from_layouts(
+                        "partial-parent",
+                        false,
+                        &input.sheets,
+                        vec![layout(stock, common)],
+                        leftover.expanded_items(),
+                        SolverMetrics2D { iterations: 0, explored_states: 0, notes: Vec::new() },
+                        0,
+                    ));
+                }
+            }
+            // Independent exhaustive allocation enumerates every combination of
+            // common counts, with no state merging or prefix comparisons.
+            let mut oracle: Option<TwoDSolution> = None;
+            for a in 1..=3 {
+                for b in 1..=3 {
+                    for c in 1..=3 {
+                        if a + b + c != 6 {
+                            continue;
+                        }
+                        let candidate = TwoDSolution::from_layouts(
+                            "oracle",
+                            false,
+                            &input.sheets,
+                            vec![layout(0, a), layout(1, b), layout(2, c), layout(3, 0)],
+                            Vec::new(),
+                            SolverMetrics2D {
+                                iterations: 0,
+                                explored_states: 0,
+                                notes: Vec::new(),
+                            },
+                            0,
+                        );
+                        if oracle.as_ref().is_none_or(|best| candidate.is_better_than(best)) {
+                            oracle = Some(candidate);
+                        }
+                    }
+                }
+            }
+            let oracle = oracle.expect("feasible exhaustive allocation");
+            let result = select_patterns(&input, &parents, &TwoDOptions::default()).expect("pool");
+            assert!(result.unplaced.is_empty());
+            assert_eq!(result.sheet_count, 4);
+            assert_eq!(result.total_cost, oracle.total_cost, "costs={costs:?}");
+            assert!(!oracle.is_better_than(&result));
+            assert!(result.metrics.notes.iter().any(|note| note.contains("memo_enabled=false")));
+            let mut counts = vec![0; input.demands.len()];
+            for sheet in &result.layouts {
+                let stock =
+                    input.sheets.iter().position(|s| s.name == sheet.sheet_name).expect("stock");
+                for (total, n) in counts.iter_mut().zip(
+                    checked_counts(&input, stock, &sheet.placements).expect("physical pattern"),
+                ) {
+                    *total += n;
+                }
+            }
+            assert_eq!(counts, input.demands.iter().map(|d| d.quantity).collect::<Vec<_>>());
+        }
     }
 
     #[test]

@@ -1,9 +1,11 @@
-//! Shared validation and source identity for explicitly bounded search experiments.
+//! Shared validation and demand identity for explicitly bounded search experiments.
 use super::maxrects::{self, MaxRectsStrategy};
 use super::{TwoDOptions, TwoDProblem, TwoDSolution};
 use crate::{BinPackingError, Result};
 
 pub(super) fn prepare(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDProblem> {
+    problem.validate()?;
+    problem.ensure_feasible_demands()?;
     let quantity = problem.demands.iter().fold(0usize, |n, d| n.saturating_add(d.quantity));
     let rotations = problem.demands.iter().filter(|d| d.can_rotate && d.width != d.height).count();
     if quantity > 128 || problem.demands.len() > 64 || problem.sheets.len() > 8 || rotations > 8 {
@@ -14,15 +16,19 @@ pub(super) fn prepare(problem: &TwoDProblem, options: &TwoDOptions) -> Result<Tw
             "bounded 2D search requires beam width 1..=32 and multistart runs 1..=16".into(),
         ));
     }
-    let mut indexed = problem.clone();
-    for (i, s) in indexed.sheets.iter_mut().enumerate() {
-        s.name = format!("search_stock_{i}");
+    if problem.sheets.iter().any(|sheet| {
+        u128::from(sheet.width) * u128::from(sheet.height) * quantity as u128 > u128::from(u64::MAX)
+    }) {
+        return Err(BinPackingError::Unsupported(
+            "bounded 2D search aggregate stock area exceeds u64::MAX".into(),
+        ));
     }
+    // Stock names are already unique. Preserve them because layout sorting
+    // uses these names before summing floating-point costs.
+    let mut indexed = problem.clone();
     for (i, d) in indexed.demands.iter_mut().enumerate() {
         d.name = format!("search_demand_{i}");
     }
-    indexed.validate()?;
-    indexed.ensure_feasible_demands()?;
     Ok(indexed)
 }
 
@@ -118,11 +124,6 @@ pub(super) fn restore(
 ) -> Result<TwoDSolution> {
     validate_solution(indexed, &solution)?;
     for layout in &mut solution.layouts {
-        let stock =
-            indexed.sheets.iter().position(|s| s.name == layout.sheet_name).ok_or_else(|| {
-                BinPackingError::Unsupported("unknown experimental stock identity".into())
-            })?;
-        layout.sheet_name = original.sheets[stock].name.clone();
         for p in &mut layout.placements {
             let demand =
                 indexed.demands.iter().position(|d| d.name == p.name).ok_or_else(|| {
