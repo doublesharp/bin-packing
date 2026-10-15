@@ -3,7 +3,7 @@
 //!
 //! This solver is the only 3D algorithm that sets
 //! [`ThreeDSolution::exact`] = `true` and populates
-//! [`ThreeDSolution::lower_bound`] from integer L0/L1 bounds. It is
+//! [`ThreeDSolution::lower_bound`] from integer conservative-scale bounds. It is
 //! restricted to a narrow class of inputs (see
 //! [`solve_branch_and_bound`]): a single uncapped bin type and demands
 //! limited to the identity rotation ([`RotationMask3D::XYZ`]).
@@ -14,9 +14,10 @@
 //! engine with volume-fit-residual scoring) or open a new bin". Search
 //! is depth-first, bounded by
 //! [`ThreeDOptions::branch_and_bound_node_limit`] expanded nodes. If the
-//! incumbent matches the L2 lower bound, the search terminates early
-//! with `exact = true`; otherwise it returns the best incumbent found
-//! with `exact = false` and the lower bound still populated.
+//! incumbent matches the conservative-scale lower bound, the search terminates
+//! early with `exact = true`; otherwise it returns the best incumbent found
+//! with `exact = false` and the lower bound still populated. Exhausting the
+//! restricted placement search alone does not prove count optimality.
 
 use std::collections::BTreeSet;
 
@@ -45,13 +46,12 @@ use crate::{BinPackingError, Result};
 ///
 /// # Algorithm
 ///
-/// 1. Compute the volume lower bound `L0 = ceil(total_item_volume /
-///    bin_volume)` using `u64` integer division — no floating point.
-/// 2. Compute the fat-item lower bound `L1 = |{ items with all three
-///    extents strictly greater than half the bin's matching extent }|`.
-///    Such items cannot pair pairwise on any axis, so each one needs its
-///    own bin.
-/// 3. Report `lower_bound = Some(L2 as f64)` with `L2 = max(L0, L1)`.
+/// 1. Compute integer conservative-scale bounds, including the volume
+///    bound and the fat-item bound, with at most nine scales per axis.
+///    Each scale preserves disjoint interval-chain capacity. Products of
+///    the three scales therefore bound the load of a feasible bin.
+/// 2. Report the strongest transformed-volume bound as `lower_bound`.
+/// 3. Use this bound to stop searching once an incumbent matches it.
 /// 4. Depth-first search sorted-by-decreasing-volume item list. Each
 ///    node branches on "place next item into existing bin k" for every
 ///    open bin k plus "open a new bin for the item". Each branch uses
@@ -59,7 +59,7 @@ use crate::{BinPackingError, Result};
 ///    [`ExtremePointsScoring::VolumeFitResidual`] to pick the actual
 ///    anchor inside the selected bin.
 /// 5. Track the incumbent by minimum bin count. When the incumbent
-///    matches `L2` the search short-circuits with `exact = true`.
+///    matches the lower bound the search short-circuits with `exact = true`.
 /// 6. When `branch_and_bound_node_limit` expanded nodes is reached the
 ///    search stops and returns the incumbent with `exact = false`.
 ///    `metrics.branch_and_bound_nodes` records the number of nodes
@@ -88,10 +88,6 @@ pub(super) fn solve_branch_and_bound(
         )));
     }
 
-    let bin = &problem.bins[0];
-    let bin_volume = volume_u64(bin.width, bin.height, bin.depth);
-    debug_assert!(bin_volume > 0, "validated bin must have positive volume");
-
     // Expanded item list, sorted by decreasing volume to drive the
     // branch order "largest unplaced first" used by MPV.
     let mut items = problem.expanded_items();
@@ -101,35 +97,9 @@ pub(super) fn solve_branch_and_bound(
         rhs.cmp(&lhs)
     });
 
-    // L0: volume lower bound via integer ceiling division.
-    let total_item_volume: u64 =
-        items.iter().map(|item| volume_u64(item.width, item.height, item.depth)).sum();
-    let l0: u64 = if total_item_volume == 0 {
-        0
-    } else {
-        // ceil(total_item_volume / bin_volume) via widened integer math.
-        total_item_volume.div_ceil(bin_volume)
-    };
-
-    // L1: fat-item lower bound. Each item whose width, height, and
-    // depth all strictly exceed half of the bin's matching extent
-    // cannot pair pairwise on any axis, so it forces its own bin.
-    //
-    // Using `2 * extent > bin_extent` is equivalent to
-    // `extent > bin_extent / 2` but avoids the floor from integer
-    // division. Widening to `u64` keeps the comparison exact for
-    // extents up to `MAX_DIMENSION_3D = 1 << 15`.
-    let half_w_gated = |w: u32| u64::from(w).saturating_mul(2) > u64::from(bin.width);
-    let half_h_gated = |h: u32| u64::from(h).saturating_mul(2) > u64::from(bin.height);
-    let half_d_gated = |d: u32| u64::from(d).saturating_mul(2) > u64::from(bin.depth);
-    let l1: u64 = items
-        .iter()
-        .filter(|item| {
-            half_w_gated(item.width) && half_h_gated(item.height) && half_d_gated(item.depth)
-        })
-        .count() as u64;
-
-    let l2: u64 = l0.max(l1);
+    // The conservative scales include the identity volume bound and the
+    // all-axes greater-than-half bound, plus bounded k-slot refinements.
+    let l2 = super::bounds::geometric_lower_bound(problem);
 
     // Depth-first branch-and-bound search.
     let node_limit = options.branch_and_bound_node_limit;
@@ -162,7 +132,7 @@ pub(super) fn solve_branch_and_bound(
         extreme_points_generated: 0,
         branch_and_bound_nodes: nodes_expanded,
         notes: vec![format!(
-            "branch_and_bound: L0={l0}, L1={l1}, L2={l2}, nodes={nodes_expanded}, \
+            "branch_and_bound: conservative_scale_bound={l2}, nodes={nodes_expanded}, \
              limit_reached={reached_limit}"
         )],
     };
@@ -420,6 +390,88 @@ mod tests {
 
     fn default_options() -> ThreeDOptions {
         ThreeDOptions { algorithm: ThreeDAlgorithm::BranchAndBound, ..ThreeDOptions::default() }
+    }
+
+    fn assert_bound_geometry(problem: &ThreeDProblem, solution: &ThreeDSolution) {
+        assert!(solution.unplaced.is_empty());
+        let mut remaining: Vec<_> = problem.demands.iter().map(|d| d.quantity).collect();
+        for layout in &solution.layouts {
+            assert_eq!(
+                (layout.width, layout.height, layout.depth),
+                (problem.bins[0].width, problem.bins[0].height, problem.bins[0].depth)
+            );
+            for (i, p) in layout.placements.iter().enumerate() {
+                let demand_index = problem
+                    .demands
+                    .iter()
+                    .enumerate()
+                    .position(|(j, d)| {
+                        remaining[j] > 0
+                            && p.name == d.name
+                            && p.rotation == super::super::Rotation3D::Xyz
+                            && (p.width, p.height, p.depth) == (d.width, d.height, d.depth)
+                    })
+                    .expect("a remaining fixed-orientation demand");
+                remaining[demand_index] -= 1;
+                assert!(
+                    u64::from(p.x) + u64::from(p.width) <= u64::from(layout.width)
+                        && u64::from(p.y) + u64::from(p.height) <= u64::from(layout.height)
+                        && u64::from(p.z) + u64::from(p.depth) <= u64::from(layout.depth)
+                );
+                for q in &layout.placements[..i] {
+                    assert!(
+                        p.x + p.width <= q.x
+                            || q.x + q.width <= p.x
+                            || p.y + p.height <= q.y
+                            || q.y + q.height <= p.y
+                            || p.z + p.depth <= q.z
+                            || q.z + q.depth <= p.z
+                    );
+                }
+            }
+        }
+        assert!(remaining.iter().all(|&quantity| quantity == 0));
+    }
+
+    #[test]
+    fn geometric_bound_measurements() {
+        for (label, demands) in [
+            ("structured17", vec![demand("cube", 40, 40, 40, 17)]),
+            ("mixed", vec![demand("cube", 40, 40, 40, 9), demand("small", 10, 20, 30, 3)]),
+        ] {
+            let problem = ThreeDProblem { bins: vec![bin("B", 100, 100, 100)], demands };
+            let start = std::time::Instant::now();
+            let solution = solve_branch_and_bound(&problem, &default_options()).expect("solve");
+            eprintln!(
+                "{label} count={} lower={:?} exact={} nodes={} elapsed_us={}",
+                solution.bin_count,
+                solution.lower_bound,
+                solution.exact,
+                solution.metrics.branch_and_bound_nodes,
+                start.elapsed().as_micros()
+            );
+            assert_bound_geometry(&problem, &solution);
+        }
+    }
+
+    #[test]
+    fn geometric_bound_nine_side_40_cubes_need_two_bins() {
+        let problem = ThreeDProblem {
+            bins: vec![bin("B", 100, 100, 100)],
+            demands: vec![demand("cube", 40, 40, 40, 9)],
+        };
+        let solution = solve_branch_and_bound(&problem, &default_options()).expect("solve");
+        eprintln!(
+            "side40 count={} lower={:?} exact={} nodes={}",
+            solution.bin_count,
+            solution.lower_bound,
+            solution.exact,
+            solution.metrics.branch_and_bound_nodes
+        );
+        assert_eq!(solution.bin_count, 2);
+        assert_eq!(solution.lower_bound, Some(2.0));
+        assert!(solution.exact);
+        assert_bound_geometry(&problem, &solution);
     }
 
     #[test]

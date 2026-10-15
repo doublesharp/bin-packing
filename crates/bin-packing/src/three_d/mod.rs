@@ -8,6 +8,7 @@
 //! backend.
 
 mod auto;
+mod bounds;
 mod column;
 mod common;
 mod dblf;
