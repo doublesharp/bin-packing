@@ -1172,7 +1172,7 @@ fn grain_lock_is_checked_even_when_rotated_dimensions_are_correct() {
 }
 
 #[test]
-fn commuting_sheet_cuts_are_deduplicated_without_losing_physical_identity() {
+fn commuting_sheet_cuts_prune_only_sequential_search_and_preserve_physical_identity() {
     for batch_across_sheets in [false, true] {
         let job = strips(3, 3);
         let options = SawPlanOptions2D {
@@ -1191,18 +1191,15 @@ fn commuting_sheet_cuts_are_deduplicated_without_losing_physical_identity() {
         replay(&job, &plan);
         assert!(plan.effort_score <= plan.search.baseline_effort_score);
         let report = serde_json::to_value(&plan.search).expect("report JSON");
-        assert!(
-            report
-                .get("dominated_states")
-                .and_then(serde_json::Value::as_u64)
-                .is_some_and(|n| n > 0)
-        );
-        assert!(
-            report
-                .get("peak_dominance_units")
-                .and_then(serde_json::Value::as_u64)
-                .is_some_and(|n| n <= 65536)
-        );
+        if batch_across_sheets {
+            assert_eq!(report["dominated_states"], 0);
+            assert_eq!(report["peak_dominance_units"], 0);
+            assert_eq!(report["dominance_table_saturated"], false);
+        } else {
+            assert!(plan.search.dominated_states > 0);
+            assert!(plan.search.peak_dominance_units > 0);
+            assert!(plan.search.peak_dominance_units <= 65536);
+        }
         assert_eq!(plan, plan_saw_cuts(&job, &options).expect("deterministic replay"));
     }
 }
