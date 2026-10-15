@@ -3,11 +3,13 @@
 //! Provides heuristics (first-fit decreasing, best-fit decreasing, local search) and an
 //! exact backend (column generation with pattern-search refinement).
 
+mod arc_flow;
 pub mod cut_plan;
 mod exact;
 mod heuristics;
 mod model;
 
+pub use arc_flow::solve_1d_arc_flow;
 pub use model::{
     CutAssignment1D, CutDemand1D, OneDAlgorithm, OneDOptions, OneDProblem, OneDSolution,
     SolverMetrics1D, Stock1D, StockLayout1D, StockRequirement1D,
