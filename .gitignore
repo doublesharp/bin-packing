@@ -25,3 +25,11 @@ npm-debug.log*
 /.scratch.json
 /.cargo/config.toml
 **/__pycache__/
+
+# Raw run evidence belongs on Scratch, outside git
+/docs/experiments/data/
+/docs/experiments/*-review.md
+/docs/two-d/saw-planner-data/
+/reports/
+/data/
+*-evidence/

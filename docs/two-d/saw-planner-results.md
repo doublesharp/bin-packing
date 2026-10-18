@@ -1,6 +1,6 @@
 # Saw planner verification and measurements
 
-This is the initial implementation snapshot. The subsequent [test audit](saw-planner-test-audit.md) documents stronger validation, corrected test assumptions, lazy baseline construction and updated measurements. Raw files below preserve the original run.
+This is the initial implementation snapshot. The subsequent [test audit](saw-planner-test-audit.md) documents stronger validation, corrected test assumptions, lazy baseline construction and updated measurements. Raw files on Scratch preserve the original run.
 
 Measured September 9, 2026 on Apple M2 Max, macOS arm64, Node v24.16.0, Chromium 151.0.7922.34. Rust and bindings use release builds for measurements. Each workload has one warmup followed by seven measured calls; the table reports median and observed maximum, not a statistical tail estimate. Timings include object serialization, planner validation/search and returned-object decoding. Module initialization and packing are excluded. The browser measurements run the actual web WASM modules in headless Chromium over a loopback HTTP server.
 
@@ -42,7 +42,7 @@ The batched passes reuse panel-stop settings in this actual sheet order:
 | 9 | 0, 0, 1, 1 |
 | 7 | 0, 1 |
 
-The full operation lists, including loads, rotations and setup instructions, are in [schedule evidence](saw-planner-data/schedules.json). Each pass has its current bounds, diagram segment and reference edge. This is sequential batching, not stacked material. Do not execute a per-sheet filtered view independently.
+The full operation lists, including loads, rotations and setup instructions, are in `schedules.json` on Scratch. Each pass has its current bounds, diagram segment and reference edge. This is sequential batching, not stacked material. Do not execute a per-sheet filtered view independently.
 
 ## Bounded performance and larger-job quality
 
@@ -59,7 +59,7 @@ The 32- and 64-part schedules reduce baseline setup changes from 12 to 2. The 12
 
 These results measure bounded responsiveness on regular grids, not worst-case construction or arbitrary production workloads. Highly fragmented layouts can exhaust the separate baseline budget and fail explicitly. Limits cap inputs, geometry cache and state evaluations; they do not impose a wall-clock deadline. The API does not model carrying distance, machine capacity, blade changes or arbitrary auxiliary waste cuts.
 
-Raw measurements include effective limits, explored states, baseline counts and returned counts: [native and Node WASM](saw-planner-data/node-performance.json), [Chromium WASM](saw-planner-data/browser-performance.json).
+Raw measurements include effective limits, explored states, baseline counts and returned counts: `node-performance.json` on Scratch, `browser-performance.json` on Scratch.
 
 ## Reproduction and coverage
 
@@ -79,3 +79,5 @@ The last command prints a temporary TypeScript file containing contextual assign
 `cargo test -p bin-packing --test saw_plan_integration --locked` exercises independent replay, initial/setup accounting, coordinate distinctions, duplicate labels, multiple stock sizes, grain locks, nonzero kerf, clipped trims, factory edges, waste, non-slicing layouts, overflow inputs, bounded backtracking, deterministic exhaustion, independently checked objective bounds, batching and larger-job quality. It includes 48 generated physical slicing layouts and an independent tiny oracle that scans integer blade positions instead of using planner candidates, including kerf, partial edge relief, waste, both machine types and all three objectives.
 
 The full repository gate is `./scripts/check-quality.sh`: formatting, TOML/text hygiene, all-target/all-feature Clippy with warnings denied, workspace tests and private-item documentation. Existing cutting integration tests and native/WASM smoke tests continue to cover legacy behavior. No package publication or Subchecker changes are part of this work.
+
+Raw run evidence is stored outside git under `/Volumes/Scratch/bin-packing/reports/release-v0.5.0-20261017/docs/two-d/saw-planner-data/`.

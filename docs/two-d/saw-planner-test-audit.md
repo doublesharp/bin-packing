@@ -53,10 +53,12 @@ The strip workload uses 145×97 panels, kerf 3 and `max_states: 0`, which isolat
 
 Every strip plan has one initial setup and zero changes. The original failure probe used 300×600 strips; the new timing series uses the benchmark's 145×97 dimensions, so no direct strip timing ratio is claimed.
 
-Raw evidence: [before native and Node WASM](saw-planner-data/audit-before-node.json), [after native and Node WASM](saw-planner-data/audit-after-node.json), [after Chromium WASM](saw-planner-data/audit-after-browser.json). Reproduction commands are in the [measurement guide](saw-planner-results.md#reproduction-and-coverage).
+Raw evidence: `audit-before-node.json` on Scratch, `audit-after-node.json` on Scratch, `audit-after-browser.json` on Scratch. Reproduction commands are in the [measurement guide](saw-planner-results.md#reproduction-and-coverage).
 
 ## Verification scope
 
 The focused Rust suite contains 31 tests. Native smoke contains eight tests and WASM smoke contains 19, including legacy binding behavior. The repository gate covers formatting, TOML/text hygiene, all-target/all-feature Clippy, workspace tests and private-item Rust documentation. Binding release builds and runtime TypeScript checks exercise the new public API.
 
 The planner remains bounded and heuristic on larger jobs. Complex layouts may still exhaust construction limits, and geometry enumeration is outside state accounting. No packing behavior, package publication or Subchecker integration is changed by this audit.
+
+Raw run evidence is stored outside git under `/Volumes/Scratch/bin-packing/reports/release-v0.5.0-20261017/docs/two-d/saw-planner-data/`.

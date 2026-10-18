@@ -1,13 +1,13 @@
 # Disposable builds on Scratch
 
-This checkout can use a chosen build directory on macOS or Linux for build outputs, temporary files, dependency downloads, and binding package assembly. Source code, lockfiles, fixtures, and committed benchmark evidence stay in the source checkout.
+This checkout can use a chosen build directory on macOS or Linux for build outputs, temporary files, dependency downloads, and binding package assembly. Source code, lockfiles and test fixtures stay in the source checkout. Raw run evidence stays outside git under `/Volumes/Scratch/bin-packing/reports/` or `/Volumes/Scratch/bin-packing/data/`; keep only short human-written summaries in docs.
 
 Choose a directory on a volume that your backup and snapshot policy excludes. Setup does not change volume, backup, or system-wide tool settings. On macOS, inspect the chosen volume with `tmutil isexcluded <volume>` and `diskutil apfs listSnapshots <volume>`.
 
 ## Setup
 
 ```sh
-python3 scripts/scratch.py setup --directory /path/to/disposable-builds
+python3 scripts/scratch.py setup --directory /Volumes/Scratch/bin-packing/cargo
 python3 scripts/scratch.py status
 ```
 

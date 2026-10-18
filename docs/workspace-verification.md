@@ -19,7 +19,7 @@ Beam search now ranks lightweight moves before allocating operation traces and s
 
 The large resource probe uses 512 strips, beam width 256 and 100,000 optimization states. Both versions return 511 cuts and consume exactly that budget. The revised beam uses 1.71 billion retired instructions versus 2.79 billion for the previous eager beam, about 39% fewer. Peak physical memory footprint remains approximately 13.4 MB for both versions. User CPU time was 0.10 versus 0.14 seconds. Concurrent compilation made wall-clock samples noisy, so these are local resource measurements, not latency guarantees.
 
-The grid benchmark uses the existing 145×97 panels with kerf 3, default weights, 4,000 optimization states, one warmup and seven measured calls. It independently replays returned geometry after timing. Raw before/after measurements are in [beam-before.json](two-d/saw-planner-data/beam-before.json) and [beam-after.json](two-d/saw-planner-data/beam-after.json). Compare medians and maxima; returned pass counts, setup changes and effort remain unchanged.
+The grid benchmark uses the existing 145×97 panels with kerf 3, default weights, 4,000 optimization states, one warmup and seven measured calls. It independently replays returned geometry after timing. Raw before/after measurements are in `beam-before.json` on Scratch and `beam-after.json` on Scratch. Compare medians and maxima; returned pass counts, setup changes and effort remain unchanged.
 
 | Parts | Native median before / after ms | Native observed maximum before / after ms |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ The grid benchmark uses the existing 145×97 panels with kerf 3, default weights
 | 64 | 3.373 / 1.526 | 3.516 / 1.812 |
 | 128 | 3.031 / 2.039 | 3.130 / 2.261 |
 
-These samples show 33–69% lower median latency on the 32–128-part fixtures. Final native and Node WASM grid/strip measurements are also retained in [beam-after-bindings.json](two-d/saw-planner-data/beam-after-bindings.json).
+These samples show 33–69% lower median latency on the 32–128-part fixtures. Final native and Node WASM grid/strip measurements are also retained in `beam-after-bindings.json` on Scratch.
 
 Reproduce the resource workload on macOS:
 
@@ -39,7 +39,7 @@ cargo build -p bin-packing --example saw_stress --release --no-default-features 
 
 The resource probe's cut counts and search budget are portable. The profiler command and instruction/footprint counters are platform-specific.
 
-Raw resource counters are retained in [beam-resources.json](two-d/saw-planner-data/beam-resources.json).
+Raw resource counters are retained in `beam-resources.json` on Scratch.
 
 ## Repeatable tools
 
@@ -83,3 +83,5 @@ cargo +nightly fuzz run three_d_modules -- -runs=2000 -max_len=2048
 ```
 
 These tests are bounded evidence, not exhaustive correctness proofs. No package was published and no other repository was modified.
+
+Raw run evidence is stored outside git under `/Volumes/Scratch/bin-packing/reports/release-v0.5.0-20261017/docs/two-d/saw-planner-data/`.
