@@ -53,13 +53,14 @@ struct NewSheetCandidate {
     contact_score: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum MaxRectsStrategy {
     BestAreaFit,
     BestShortSideFit,
     BestLongSideFit,
     BottomLeft,
     ContactPoint,
+    DemandAware,
 }
 
 pub(super) fn solve_maxrects(problem: &TwoDProblem, options: &TwoDOptions) -> Result<TwoDSolution> {
@@ -187,9 +188,17 @@ pub(super) fn pack_with_order(
     let mut sheets = Vec::<SheetState>::new();
     let mut usage_counts = vec![0_usize; problem.sheets.len()];
     let mut unplaced = Vec::new();
+    let mut opportunity_evaluations = 0usize;
 
     for (item_index, item) in items.iter().enumerate() {
-        if let Some(candidate) = choose_existing_candidate(problem, &sheets, item, strategy) {
+        if let Some(candidate) = choose_existing_candidate(
+            problem,
+            &sheets,
+            item,
+            strategy,
+            &items[item_index + 1..],
+            &mut opportunity_evaluations,
+        ) {
             let stock_index = sheets[candidate.sheet_index].stock_index;
             let sheet_def = &problem.sheets[stock_index];
             let (eff_w, eff_h) = crate::two_d::model::effective_bounds(sheet_def);
@@ -205,9 +214,14 @@ pub(super) fn pack_with_order(
             continue;
         }
 
-        if let Some(candidate) =
-            choose_new_sheet(problem, item, &usage_counts, strategy, &items[item_index + 1..])
-        {
+        if let Some(candidate) = choose_new_sheet(
+            problem,
+            item,
+            &usage_counts,
+            strategy,
+            &items[item_index + 1..],
+            &mut opportunity_evaluations,
+        ) {
             let stock = &problem.sheets[candidate.stock_index];
             let (eff_w, eff_h) = crate::two_d::model::effective_bounds(stock);
             let mut state = SheetState {
@@ -259,7 +273,7 @@ pub(super) fn pack_with_order(
         unplaced,
         SolverMetrics2D {
             iterations,
-            explored_states: 0,
+            explored_states: opportunity_evaluations,
             notes: vec![strategy.note().to_string()],
         },
         options.min_usable_side,
@@ -271,26 +285,50 @@ fn choose_existing_candidate(
     sheets: &[SheetState],
     item: &ItemInstance2D,
     strategy: MaxRectsStrategy,
+    remaining_items: &[ItemInstance2D],
+    opportunity_evaluations: &mut usize,
 ) -> Option<PlacementCandidate> {
-    sheets
-        .iter()
-        .enumerate()
-        .flat_map(|(sheet_index, sheet)| {
-            sheet.free_rects.iter().enumerate().flat_map(move |(free_index, free)| {
-                item.orientations()
-                    .filter(move |(width, height, _)| free.fits(*width, *height))
-                    .map(move |(width, height, rotated)| {
-                        build_candidate(
-                            problem,
-                            sheet,
-                            sheet_index,
-                            free_index,
-                            Oriented { width, height, rotated },
-                        )
-                    })
-            })
+    let candidates = sheets.iter().enumerate().flat_map(|(sheet_index, sheet)| {
+        sheet.free_rects.iter().enumerate().flat_map(move |(free_index, free)| {
+            item.orientations().filter(move |(width, height, _)| free.fits(*width, *height)).map(
+                move |(width, height, rotated)| {
+                    build_candidate(
+                        problem,
+                        sheet,
+                        sheet_index,
+                        free_index,
+                        Oriented { width, height, rotated },
+                    )
+                },
+            )
         })
-        .min_by(|left, right| compare_candidates(strategy, left, right))
+    });
+    if strategy != MaxRectsStrategy::DemandAware {
+        return candidates.min_by(|left, right| compare_candidates(strategy, left, right));
+    }
+    let shortlist = bounded_shortlist(candidates, |a, b| {
+        compare_candidates(MaxRectsStrategy::BestAreaFit, a, b)
+    });
+    shortlist.into_iter().min_by_key(|candidate| {
+        *opportunity_evaluations += 1;
+        let sheet = &sheets[candidate.sheet_index];
+        let stock = &problem.sheets[sheet.stock_index];
+        let (width, height) = super::model::effective_bounds(stock);
+        let after = carved_free_rects(
+            &sheet.free_rects,
+            Rect {
+                x: candidate.x,
+                y: candidate.y,
+                width: candidate.width,
+                height: candidate.height,
+            },
+            width,
+            height,
+            stock.kerf,
+            min_side_for(stock),
+        );
+        opportunity_loss(&sheet.free_rects, &after, remaining_items, stock)
+    })
 }
 
 fn choose_new_sheet(
@@ -299,8 +337,9 @@ fn choose_new_sheet(
     usage_counts: &[usize],
     strategy: MaxRectsStrategy,
     remaining_items: &[ItemInstance2D],
+    opportunity_evaluations: &mut usize,
 ) -> Option<NewSheetCandidate> {
-    problem
+    let candidates = problem
         .sheets
         .iter()
         .enumerate()
@@ -331,8 +370,90 @@ fn choose_new_sheet(
                     left: 0,
                     contact_score: width.saturating_add(height),
                 })
+        });
+    if strategy != MaxRectsStrategy::DemandAware {
+        return candidates
+            .min_by(|left, right| compare_new_sheet_candidates(strategy, left, right));
+    }
+    let shortlist = bounded_shortlist(candidates, |a, b| {
+        compare_new_sheet_candidates(MaxRectsStrategy::BestAreaFit, a, b)
+    });
+    shortlist.into_iter().min_by_key(|candidate| {
+        *opportunity_evaluations += 1;
+        let stock = &problem.sheets[candidate.stock_index];
+        let (width, height) = super::model::effective_bounds(stock);
+        let before = [Rect { x: 0, y: 0, width, height }];
+        let after = carved_free_rects(
+            &before,
+            Rect { x: 0, y: 0, width: candidate.width, height: candidate.height },
+            width,
+            height,
+            stock.kerf,
+            min_side_for(stock),
+        );
+        opportunity_loss(&before, &after, remaining_items, stock)
+    })
+}
+
+// Keep at most 16 geometric candidates before demand scoring. Stable sorting
+// preserves deterministic geometry/enumeration ties. Memory is O(16).
+fn bounded_shortlist<T>(
+    candidates: impl Iterator<Item = T>,
+    compare: impl Fn(&T, &T) -> Ordering,
+) -> Vec<T> {
+    let mut retained = Vec::new();
+    for candidate in candidates {
+        retained.push(candidate);
+        retained.sort_by(&compare);
+        retained.truncate(16);
+    }
+    retained
+}
+
+// A single-rectangle grid is a feasible capacity estimate. Taking the maximum
+// instead of summing maximal rectangles never double-counts their overlap. It
+// can underestimate separated cavities and mixed orientations, so it is only
+// a heuristic. Kerf separates adjacent grid cells; the edge has no extra kerf.
+fn cavity_capacity(rects: &[Rect], item: &ItemInstance2D, stock: &Sheet2D) -> u64 {
+    let kerf = stock.kerf;
+    rects
+        .iter()
+        .flat_map(|r| {
+            item.orientations().filter(|&(w, h, _)| w <= stock.width && h <= stock.height).map(
+                move |(w, h, _)| {
+                    ((u64::from(r.width) + u64::from(kerf)) / (u64::from(w) + u64::from(kerf)))
+                        .saturating_mul(
+                            (u64::from(r.height) + u64::from(kerf))
+                                / (u64::from(h) + u64::from(kerf)),
+                        )
+                },
+            )
         })
-        .min_by(|left, right| compare_new_sheet_candidates(strategy, left, right))
+        .max()
+        .unwrap_or(0)
+}
+
+// O(R^2 + R F) for R remaining pieces and F free rectangles. The public opt-in
+// boundary caps R at 128. Repeated instances contribute repeated opportunity.
+fn opportunity_loss(
+    before: &[Rect],
+    after: &[Rect],
+    remaining: &[ItemInstance2D],
+    stock: &Sheet2D,
+) -> (usize, u64) {
+    let mut lost_last = 0usize;
+    let mut capacity_loss = 0u64;
+    for (index, item) in remaining.iter().enumerate() {
+        if remaining[..index].iter().any(|p| p.name == item.name) {
+            continue;
+        }
+        let quantity = remaining.iter().filter(|p| p.name == item.name).count();
+        let old = cavity_capacity(before, item, stock).min(quantity as u64);
+        let new = cavity_capacity(after, item, stock).min(quantity as u64);
+        lost_last += if old > 0 && new == 0 { quantity } else { 0 };
+        capacity_loss = capacity_loss.saturating_add(old.saturating_sub(new));
+    }
+    (lost_last, capacity_loss)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -394,6 +515,26 @@ fn place_candidate(
         rotated: candidate.rotated,
     });
 
+    sheet.free_rects = carved_free_rects(
+        &sheet.free_rects,
+        placed,
+        sheet_width,
+        sheet_height,
+        sheet_kerf,
+        min_side,
+    );
+}
+
+// O(F^2) containment pruning for F maximal rectangles. Scoring clones only
+// Copy geometry, never placement labels, layouts, or other owned input strings.
+fn carved_free_rects(
+    free_rects: &[Rect],
+    placed: Rect,
+    sheet_width: u32,
+    sheet_height: u32,
+    sheet_kerf: u32,
+    min_side: u32,
+) -> Vec<Rect> {
     // The "kerf-inflated" footprint that carves out of free space. It extends
     // by `kerf` on all four sides of the placed rect, clipped to the sheet
     // boundary — the factory edge is not a cut (D3). Inflating on every side
@@ -414,17 +555,18 @@ fn place_candidate(
         height: inflated_bottom - inflated_top,
     };
 
-    let old_free_rects = std::mem::take(&mut sheet.free_rects);
-    for free_rect in old_free_rects {
+    let mut result = Vec::new();
+    for &free_rect in free_rects {
         if !free_rect.intersects(carved) {
-            sheet.free_rects.push(free_rect);
+            result.push(free_rect);
             continue;
         }
 
-        split_free_rect(free_rect, carved, &mut sheet.free_rects, min_side);
+        split_free_rect(free_rect, carved, &mut result, min_side);
     }
 
-    prune_contained_rects(&mut sheet.free_rects);
+    prune_contained_rects(&mut result);
+    result
 }
 
 fn push_free_rect(target: &mut Vec<Rect>, rect: Rect, min_side: u32) {
@@ -644,7 +786,7 @@ pub(super) fn sort_items_descending(items: &mut [ItemInstance2D]) {
 impl MaxRectsStrategy {
     fn compare(self, left: CandidateMetrics, right: CandidateMetrics) -> Ordering {
         match self {
-            Self::BestAreaFit => left
+            Self::BestAreaFit | Self::DemandAware => left
                 .area_waste
                 .cmp(&right.area_waste)
                 .then_with(|| left.short_side_fit.cmp(&right.short_side_fit))
@@ -679,6 +821,7 @@ impl MaxRectsStrategy {
             Self::BestLongSideFit => "best-long-side-fit MaxRects with free-rectangle splitting",
             Self::BottomLeft => "bottom-left MaxRects with free-rectangle splitting",
             Self::ContactPoint => "contact-point MaxRects with free-rectangle splitting",
+            Self::DemandAware => "bounded remaining-demand opportunity loss over free geometry",
         }
     }
 }
@@ -1128,5 +1271,45 @@ mod tests {
         let max_right =
             sheet.placements.iter().map(|p| p.x + p.width).max().expect("placements nonempty");
         assert_eq!(max_right, 49);
+    }
+}
+
+#[cfg(test)]
+mod demand_space_tests {
+    use super::*;
+
+    #[test]
+    fn overlapping_maximal_spaces_are_not_added_as_independent_capacity() {
+        let stock = Sheet2D {
+            name: "stock".into(),
+            width: 8,
+            height: 8,
+            cost: 1.0,
+            quantity: None,
+            kerf: 0,
+            edge_kerf_relief: false,
+        };
+        let item = ItemInstance2D {
+            name: "part".into(),
+            width: 4,
+            height: 4,
+            can_rotate: false,
+            fixed_rotation: None,
+        };
+        let spaces =
+            [Rect { x: 0, y: 0, width: 8, height: 4 }, Rect { x: 0, y: 0, width: 4, height: 8 }];
+        assert_eq!(cavity_capacity(&spaces, &item, &stock), 2);
+        let kerfed = Sheet2D { kerf: 1, ..stock };
+        assert_eq!(cavity_capacity(&spaces, &item, &kerfed), 1);
+        // A single remaining piece does not gain capacity from unused extra slots.
+        assert_eq!(
+            opportunity_loss(
+                &[Rect { x: 0, y: 0, width: 8, height: 8 }],
+                &spaces,
+                &[item],
+                &kerfed
+            ),
+            (0, 0)
+        );
     }
 }

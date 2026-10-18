@@ -345,14 +345,15 @@ pub struct ThreeDSolution {
     /// (e.g. `"extreme_points_residual_space"`), never the literal string
     /// `"auto"`. Mirrors the 1D / 2D convention.
     pub algorithm: String,
-    /// Whether the solution is proven optimal. Set to `true` only by
-    /// `branch_and_bound` when the search exhausts the tree below
-    /// `branch_and_bound_node_limit`. Every other algorithm leaves this
-    /// as `false`.
+    /// Whether the bin count is proven optimal. Set to `true` only by
+    /// `branch_and_bound` when a feasible incumbent matches its valid lower
+    /// bound before the node budget is exhausted. Completing the restricted
+    /// placement search alone does not prove optimality. Other algorithms
+    /// leave this as `false`.
     pub exact: bool,
     /// Optional lower bound on the optimal objective (number of bins).
-    /// Populated only by `branch_and_bound` from the L0/L1/L2 bounds it
-    /// computes; `None` for every other algorithm in v1.
+    /// Populated only by `branch_and_bound` from its integer conservative-scale
+    /// bounds; `None` for every other algorithm in v1.
     pub lower_bound: Option<f64>,
     /// Whether the layouts are guillotine-compatible. Set to `true` by
     /// `guillotine_3d*` and by `layer_building_guillotine`; `false` by

@@ -1,0 +1,20 @@
+{
+  "problem": {
+    "stock": [
+      {"name":"s0","length":17,"kerf":1,"trim":0,"cost":1.0,"available":3},
+      {"name":"s1","length":21,"kerf":1,"trim":0,"cost":1.0,"available":3},
+      {"name":"s2","length":16,"kerf":0,"trim":0,"cost":2.0,"available":1}
+    ],
+    "demands": [
+      {"name":"d0","length":11,"quantity":3},
+      {"name":"d1","length":7,"quantity":2},
+      {"name":"d2","length":9,"quantity":2},
+      {"name":"d3","length":9,"quantity":1}
+    ]
+  },
+  "options": {
+    "algorithm":"auto","multistart_runs":16,"improvement_rounds":24,
+    "column_generation_rounds":4,"exact_pattern_limit":10000,
+    "auto_exact_max_types":14,"auto_exact_max_quantity":96,"seed":7
+  }
+}

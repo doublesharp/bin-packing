@@ -8,6 +8,7 @@
 //! backend.
 
 mod auto;
+mod bounds;
 mod column;
 mod common;
 mod dblf;
@@ -57,6 +58,35 @@ pub fn solve_3d(problem: ThreeDProblem, options: ThreeDOptions) -> Result<ThreeD
     }
 
     Ok(solution)
+}
+
+/// Solve using the selected algorithm, then try seeded joint target-bin repair.
+///
+/// This opt-in heuristic destroys a target bin and repacks its contents jointly
+/// with up to three destination bins. Equal-quality exploratory rearrangements
+/// are allowed; the returned incumbent never ranks worse than the ordinary solve.
+/// Existing bin instances and allowed rotations are preserved. Guillotine-required
+/// problems skip repair because arbitrary extreme-point layouts cannot certify
+/// guillotine cuts.
+///
+/// Repair tries at most `min(multistart_runs, 32) * min(improvement_rounds, 32)`
+/// neighborhoods, with at least one start when rounds are nonzero. Neighborhoods
+/// containing more than 48 items are skipped. Each neighborhood attempts at most
+/// two greedy repacks, with at most four bins and six orientations per item.
+/// These caps bound the extra work independently of user option magnitudes.
+///
+/// # Errors
+///
+/// Returns the same validation, feasibility, and algorithm errors as [`solve_3d`].
+pub fn solve_3d_repaired(problem: ThreeDProblem, options: ThreeDOptions) -> Result<ThreeDSolution> {
+    let initial = solve_3d(problem.clone(), options.clone())?;
+    let required_counts: Vec<_> =
+        initial.bin_requirements.iter().map(|requirement| requirement.required_quantity).collect();
+    let mut repaired = local_search::repair_target_bins(initial, &problem, &options);
+    if !required_counts.is_empty() {
+        set_bin_requirements(&mut repaired, &problem.bins, &required_counts);
+    }
+    Ok(repaired)
 }
 
 fn solve_3d_core(problem: &ThreeDProblem, options: &ThreeDOptions) -> Result<ThreeDSolution> {

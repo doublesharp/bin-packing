@@ -1170,3 +1170,55 @@ fn grain_lock_is_checked_even_when_rotated_dimensions_are_correct() {
     job.problem.demands[0].can_rotate = true;
     replay(&job, &plan_saw_cuts(&job, &Default::default()).expect("only grain permission changed"));
 }
+
+#[test]
+fn commuting_sheet_cuts_prune_only_sequential_search_and_preserve_physical_identity() {
+    for batch_across_sheets in [false, true] {
+        let job = strips(3, 3);
+        let options = SawPlanOptions2D {
+            batch_across_sheets,
+            search: SawSearchLimits2D { max_states: 100000, beam_width: 256, ..Default::default() },
+            ..Default::default()
+        };
+        let started = std::time::Instant::now();
+        let plan = plan_saw_cuts(&job, &options).expect("physical commuting cuts");
+        eprintln!(
+            "batch={batch_across_sheets} elapsed={:?} effort={} search={:?}",
+            started.elapsed(),
+            plan.effort_score,
+            plan.search
+        );
+        replay(&job, &plan);
+        assert!(plan.effort_score <= plan.search.baseline_effort_score);
+        let report = serde_json::to_value(&plan.search).expect("report JSON");
+        if batch_across_sheets {
+            assert_eq!(report["dominated_states"], 0);
+            assert_eq!(report["peak_dominance_units"], 0);
+            assert_eq!(report["dominance_table_saturated"], false);
+        } else {
+            assert!(plan.search.dominated_states > 0);
+            assert!(plan.search.peak_dominance_units > 0);
+            assert!(plan.search.peak_dominance_units <= 65536);
+        }
+        assert_eq!(plan, plan_saw_cuts(&job, &options).expect("deterministic replay"));
+    }
+}
+
+#[test]
+fn legacy_saw_report_json_defaults_new_pruning_diagnostics() {
+    let plan = plan_saw_cuts(&strips(3, 2), &Default::default()).expect("physical saw plan");
+    let mut legacy = serde_json::to_value(&plan).expect("serialize current plan");
+    let report = legacy["search"].as_object_mut().expect("search report object");
+    for field in ["dominated_states", "peak_dominance_units", "dominance_table_saturated"] {
+        assert!(report.remove(field).is_some(), "current report must emit {field}");
+    }
+    let decoded: SawPlan2D =
+        serde_json::from_value(legacy).expect("legacy report remains readable");
+    assert_eq!(decoded.search.dominated_states, 0);
+    assert_eq!(decoded.search.peak_dominance_units, 0);
+    assert!(!decoded.search.dominance_table_saturated);
+    replay(&strips(3, 2), &decoded);
+    assert_eq!(decoded.operations, plan.operations);
+    assert_eq!(decoded.counts, plan.counts);
+    assert_eq!(decoded.effort_score, plan.effort_score);
+}
