@@ -914,3 +914,14 @@ seeded counterexample finder. `scripts/check-bindings.sh` rebuilds and checks bo
 packages; `scripts/check-features.sh` includes the separate fuzz project.
 
 For local builds on a separate disposable volume, see [Scratch build storage](docs/scratch-builds.md).
+
+## Contributing and community
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, verification, bug
+reports, and pull requests. Project participation follows the
+[code of conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately using
+the [security policy](SECURITY.md).
+
+## License
+
+Licensed under the [MIT License](LICENSE).
