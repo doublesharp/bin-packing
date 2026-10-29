@@ -150,10 +150,11 @@ dimension-specific entry point:
 import { solve2d } from '@0xdoublesharp/bin-packing-wasm/two-d';
 ```
 
-With the additional constrained APIs, the uncompressed WASM assets measure
-approximately 309 KiB for 1D, 637 KiB for 2D, 663 KiB for 3D, and 1.16 MiB
-for combined 1D+2D+3D after `wasm-opt -Oz`. These figures exclude JavaScript
-wrappers and transfer compression; run the build locally for current sizes.
+The [October 28 expansion build](../../docs/experiments/2026-10-28-packingsolver-completion.md)
+recorded uncompressed web WASM assets of approximately 380 KiB for 1D,
+873 KiB for 2D, 911 KiB for 3D, 753 KiB for irregular-only and 2.25 MiB for
+combined 1D+2D+3D+irregular. These figures exclude JavaScript wrappers and transfer
+compression; run the build locally for current sizes.
 
 ### Browser (raw ES modules / Deno)
 

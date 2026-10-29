@@ -18,6 +18,26 @@ For a quick feature tour or a Getting Started guide, see the top-level
   point: `solve_2d`.
 - **[three-d/](three-d/)** — three-dimensional rectangular bin packing.
   Entry point: `solve_3d`.
+- **[irregular.md](irregular.md)** — polygon, circle and arc nesting, with holes,
+  rigid components, reflection and spacing. Entry point: `solve_irregular`.
+
+## Physical models and optimization
+
+- [Explicit objectives](objectives.md): material cost, profit/knapsack,
+  feasibility and open dimensions, with mandatory quantities and search reports.
+- [Staged cutting](two-d/staged.md): physical guillotine cut trees, machine
+  restrictions, kerf, trims, defects and production groups.
+- [Stack loading](three-d/loading.md): nested upright columns, stack/payload
+  limits, axle reactions and unloading rules.
+- [Constrained 2D](two-d/constrained.md) and [constrained 3D](three-d/constrained.md):
+  source-indexed packing with material exclusions or payload limits.
+- [Adaptive 2D](two-d/adaptive.md) and [2D bounds](two-d/bounds.md): bounded
+  algorithm selection and conservative sheet-count certificates.
+- [1D minimum cost](one-d/min-cost.md): stock-price optimization under inventory
+  and work limits.
+
+See [v0.6.0](releases/v0.6.0.md) for release and compatibility notes and the
+[testing guide](testing-confidence.md) for verification commands and proof scope.
 
 ## 1D algorithms
 

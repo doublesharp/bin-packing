@@ -26,6 +26,10 @@ bindings.
 
 ## Features
 
+See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the new physical
+models, optimization APIs and compatibility notes. The
+[testing guide](docs/testing-confidence.md) explains validation and coverage.
+
 ### Native geometry, physical rules and explicit objectives
 
 - [Irregular nesting](docs/irregular.md): concave polygons, holes, circular arcs,
