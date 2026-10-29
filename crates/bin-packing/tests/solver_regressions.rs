@@ -5,8 +5,8 @@ use bin_packing::one_d::{
     CutDemand1D, OneDAlgorithm, OneDOptions, OneDProblem, OneDSolution, Stock1D, solve_1d,
 };
 use bin_packing::three_d::{
-    Bin3D, BoxDemand3D, Placement3D, RotationMask3D, ThreeDAlgorithm, ThreeDOptions, ThreeDProblem,
-    ThreeDSolution, solve_3d,
+    Bin3D, BoxDemand3D, Placement3D, Rotation3D, RotationMask3D, ThreeDAlgorithm, ThreeDOptions,
+    ThreeDProblem, ThreeDSolution, solve_3d,
 };
 use bin_packing::two_d::{
     Placement2D, RectDemand2D, Sheet2D, TwoDAlgorithm, TwoDOptions, TwoDProblem, TwoDSolution,
@@ -1274,6 +1274,7 @@ fn stock_requirements_preserve_problem_stock_order() {
 proptest! {
     #![proptest_config(Config {
         failure_persistence: None,
+        rng_seed: proptest::test_runner::RngSeed::Fixed(0xB1CA_BAC0),
         .. Config::default()
     })]
 
@@ -1358,6 +1359,8 @@ fn assert_valid_3d_solution(problem: &ThreeDProblem, solution: &ThreeDSolution) 
         let bin =
             bin_lookup.get(&layout.bin_name).expect("layout should reference a declared bin type");
 
+        assert_eq!(layout.cost, bin.cost, "layout must preserve the source stock price");
+
         assert_placements_3d_non_overlapping(&layout.placements);
 
         let mut used_vol: u64 = 0;
@@ -1407,6 +1410,11 @@ fn assert_valid_3d_solution(problem: &ThreeDProblem, solution: &ThreeDSolution) 
                 })
                 .expect("placement should correspond to a declared demand");
 
+            assert!(
+                demand.allowed_rotations.contains(placement.rotation),
+                "solver used a forbidden source rotation: {placement:?}"
+            );
+
             let key = (demand.name.clone(), demand.width, demand.height, demand.depth);
             let entry = remaining.get_mut(&key).expect("demand counter missing");
             assert!(*entry > 0, "demand placed more times than requested");
@@ -1450,6 +1458,99 @@ fn assert_valid_3d_solution(problem: &ThreeDProblem, solution: &ThreeDSolution) 
         solution.total_cost,
         total_cost
     );
+}
+
+proptest! {
+    #![proptest_config(Config {
+        cases: 64,
+        rng_seed: proptest::test_runner::RngSeed::Fixed(0xC0FF_EE28),
+        failure_persistence: None,
+        ..Config::default()
+    })]
+
+    #[test]
+    fn randomized_3d_strategies_preserve_finite_inventory_and_single_rotation(
+        edge in 6_u32..13,
+        available in 1_usize..4,
+        rows in prop::collection::vec((1_u32..7, 1_u32..7, 1_u32..7, 1_usize..4, 0_usize..6), 1..5),
+    ) {
+        let rotations = [
+            (RotationMask3D::XYZ, Rotation3D::Xyz),
+            (RotationMask3D::XZY, Rotation3D::Xzy),
+            (RotationMask3D::YXZ, Rotation3D::Yxz),
+            (RotationMask3D::YZX, Rotation3D::Yzx),
+            (RotationMask3D::ZXY, Rotation3D::Zxy),
+            (RotationMask3D::ZYX, Rotation3D::Zyx),
+        ];
+        let demands = rows.iter().enumerate().map(|(index, &(width, height, depth, quantity, rotation))| {
+            BoxDemand3D {
+                name: format!("source_{index}"), width, height, depth, quantity,
+                allowed_rotations: rotations[rotation].0,
+            }
+        }).collect();
+        let problem = ThreeDProblem {
+            bins: vec![Bin3D {
+                name: "limited".into(), width: edge, height: edge, depth: edge,
+                cost: 0.375, quantity: Some(available),
+            }],
+            demands,
+        };
+        // Every construction family is exercised directly; Auto cannot hide a
+        // broken orientation or inventory path in an otherwise valid fallback.
+        let algorithms = [
+            ThreeDAlgorithm::Auto,
+            ThreeDAlgorithm::ExtremePoints,
+            ThreeDAlgorithm::ExtremePointsResidualSpace,
+            ThreeDAlgorithm::ExtremePointsFreeVolume,
+            ThreeDAlgorithm::ExtremePointsBottomLeftBack,
+            ThreeDAlgorithm::ExtremePointsContactPoint,
+            ThreeDAlgorithm::ExtremePointsEuclidean,
+            ThreeDAlgorithm::Guillotine3D,
+            ThreeDAlgorithm::Guillotine3DBestShortSideFit,
+            ThreeDAlgorithm::Guillotine3DBestLongSideFit,
+            ThreeDAlgorithm::Guillotine3DShorterLeftoverAxis,
+            ThreeDAlgorithm::Guillotine3DLongerLeftoverAxis,
+            ThreeDAlgorithm::Guillotine3DMinVolumeSplit,
+            ThreeDAlgorithm::Guillotine3DMaxVolumeSplit,
+            ThreeDAlgorithm::LayerBuilding,
+            ThreeDAlgorithm::LayerBuildingMaxRects,
+            ThreeDAlgorithm::LayerBuildingSkyline,
+            ThreeDAlgorithm::LayerBuildingGuillotine,
+            ThreeDAlgorithm::LayerBuildingShelf,
+            ThreeDAlgorithm::WallBuilding,
+            ThreeDAlgorithm::ColumnBuilding,
+            ThreeDAlgorithm::DeepestBottomLeft,
+            ThreeDAlgorithm::DeepestBottomLeftFill,
+            ThreeDAlgorithm::FirstFitDecreasingVolume,
+            ThreeDAlgorithm::BestFitDecreasingVolume,
+            ThreeDAlgorithm::MultiStart,
+            ThreeDAlgorithm::Grasp,
+            ThreeDAlgorithm::LocalSearch,
+        ];
+        for algorithm in algorithms {
+            let solution = solve_3d(problem.clone(), ThreeDOptions {
+                algorithm, beam_width: 2, multistart_runs: 2, improvement_rounds: 2,
+                auto_exact_max_quantity: 0, auto_exact_max_types: 0,
+                branch_and_bound_node_limit: 512, seed: Some(2026_1028),
+                ..ThreeDOptions::default()
+            }).expect("bounded legal 3D source must solve");
+            assert_valid_3d_solution(&problem, &solution);
+            prop_assert!(solution.layouts.len() <= available, "{:?} exceeded stock", algorithm);
+            prop_assert!(solution.layouts.iter().any(|layout| !layout.placements.is_empty()),
+                "{:?} must place at least one item when positive stock fits every source", algorithm);
+            for layout in &solution.layouts {
+                for part in &layout.placements {
+                    let index = problem.demands.iter().position(|demand| demand.name == part.name)
+                        .expect("placement must have a declared source");
+                    let (w, h, d, _, rotation) = rows[index];
+                    prop_assert_eq!(part.rotation, rotations[rotation].1, "{:?} used another orientation", algorithm);
+                    // Independent source-axis table, including nonidentity-only masks.
+                    let expected = [(w,h,d), (w,d,h), (h,w,d), (h,d,w), (d,w,h), (d,h,w)][rotation];
+                    prop_assert_eq!((part.width, part.height, part.depth), expected, "{:?} changed geometry", algorithm);
+                }
+            }
+        }
+    }
 }
 
 fn sample_3d_problem() -> ThreeDProblem {
@@ -1599,6 +1700,86 @@ fn three_d_algorithms_produce_consistent_valid_solutions() {
                 assert!(!solution.algorithm.is_empty(), "{algorithm:?} must set algorithm field");
             }
             Err(e) => panic!("{algorithm:?} returned unexpected error: {e:?}"),
+        }
+
+        for (label, dimensions, mask, rotation, quantity, include_ineligible) in [
+            ("exact XYZ", (3, 5, 7), RotationMask3D::XYZ, Rotation3D::Xyz, 1, false),
+            ("exact YZX", (7, 3, 5), RotationMask3D::YZX, Rotation3D::Yzx, 1, false),
+            ("ineligible stock first", (3, 5, 7), RotationMask3D::XYZ, Rotation3D::Xyz, 1, true),
+            ("one bin two copies", (3, 5, 7), RotationMask3D::XYZ, Rotation3D::Xyz, 2, false),
+        ] {
+            let mut bins = Vec::new();
+            if include_ineligible {
+                bins.push(Bin3D {
+                    name: "ineligible".into(),
+                    width: 7,
+                    height: 5,
+                    depth: 3,
+                    cost: 1.0,
+                    quantity: Some(1),
+                });
+            }
+            bins.push(Bin3D {
+                name: "eligible".into(),
+                width: 3,
+                height: 5,
+                depth: 7,
+                cost: 1.0,
+                quantity: Some(1),
+            });
+            let (w, h, d) = dimensions;
+            let boundary_problem = ThreeDProblem {
+                bins,
+                demands: vec![BoxDemand3D {
+                    name: "source".into(),
+                    width: w,
+                    height: h,
+                    depth: d,
+                    quantity,
+                    allowed_rotations: mask,
+                }],
+            };
+            let boundary_solution = solve_3d(
+                boundary_problem.clone(),
+                ThreeDOptions {
+                    algorithm,
+                    seed: Some(42),
+                    auto_exact_max_quantity: 0,
+                    auto_exact_max_types: 0,
+                    ..ThreeDOptions::default()
+                },
+            )
+            .expect("legal anisotropic boundary problem must solve");
+            assert_valid_3d_solution(&boundary_problem, &boundary_solution);
+            assert_eq!(
+                boundary_solution.layouts.len(),
+                1,
+                "{label}: {algorithm:?} must use the available fitting bin"
+            );
+            let layout = &boundary_solution.layouts[0];
+            assert_eq!(
+                layout.bin_name, "eligible",
+                "{label}: {algorithm:?} chose ineligible stock"
+            );
+            assert_eq!(
+                layout.placements.len(),
+                1,
+                "{label}: {algorithm:?} must place one full-bin item"
+            );
+            let placement = &layout.placements[0];
+            let source_axes = [(w, h, d), (w, d, h), (h, w, d), (h, d, w), (d, w, h), (d, h, w)];
+            let expected = source_axes[if rotation == Rotation3D::Xyz { 0 } else { 3 }];
+            assert_eq!(placement.rotation, rotation, "{label}: {algorithm:?} rotation");
+            assert_eq!(
+                (placement.width, placement.height, placement.depth),
+                expected,
+                "{label}: {algorithm:?} source axes"
+            );
+            assert_eq!(
+                boundary_solution.unplaced.iter().map(|item| item.quantity).sum::<usize>(),
+                quantity - 1,
+                "{label}: {algorithm:?} quantity accounting"
+            );
         }
     }
 }

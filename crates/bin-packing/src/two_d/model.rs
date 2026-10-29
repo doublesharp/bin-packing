@@ -883,6 +883,72 @@ mod tests {
     }
 
     #[test]
+    fn validation_reports_each_dimension_and_quantity_boundary() {
+        let valid = sample_problem();
+        assert!(valid.validate().is_ok());
+        for (sheet, width, value, expected) in [
+            (true, true, 0, "sheet `sheet` must have positive width and height".to_string()),
+            (true, false, 0, "sheet `sheet` must have positive width and height".to_string()),
+            (false, true, 0, "demand `panel` must have positive width and height".to_string()),
+            (false, false, 0, "demand `panel` must have positive width and height".to_string()),
+            (
+                true,
+                true,
+                MAX_DIMENSION + 1,
+                format!("sheet `sheet` dimensions exceed the supported maximum of {MAX_DIMENSION}"),
+            ),
+            (
+                true,
+                false,
+                MAX_DIMENSION + 1,
+                format!("sheet `sheet` dimensions exceed the supported maximum of {MAX_DIMENSION}"),
+            ),
+            (
+                false,
+                true,
+                MAX_DIMENSION + 1,
+                format!(
+                    "demand `panel` dimensions exceed the supported maximum of {MAX_DIMENSION}"
+                ),
+            ),
+            (
+                false,
+                false,
+                MAX_DIMENSION + 1,
+                format!(
+                    "demand `panel` dimensions exceed the supported maximum of {MAX_DIMENSION}"
+                ),
+            ),
+        ] {
+            let mut input = valid.clone();
+            match (sheet, width) {
+                (true, true) => input.sheets[0].width = value,
+                (true, false) => input.sheets[0].height = value,
+                (false, true) => input.demands[0].width = value,
+                (false, false) => input.demands[0].height = value,
+            }
+            assert!(
+                matches!(input.validate(), Err(BinPackingError::InvalidInput(message)) if message == expected)
+            );
+        }
+        let mut boundary = valid.clone();
+        boundary.sheets[0].width = MAX_DIMENSION;
+        boundary.demands[0].height = MAX_DIMENSION;
+        boundary.demands[0].quantity = MAX_QUANTITY - 1;
+        assert!(boundary.validate().is_ok());
+        boundary.demands[0].quantity = MAX_QUANTITY;
+        assert!(
+            matches!(boundary.validate(), Err(BinPackingError::InvalidInput(message)) if message == format!("total demand quantity exceeds the supported maximum of {MAX_QUANTITY}"))
+        );
+        if let Some(over) = MAX_QUANTITY.checked_add(1) {
+            boundary.demands[0].quantity = over;
+            assert!(
+                matches!(boundary.validate(), Err(BinPackingError::InvalidInput(message)) if message == format!("demand `panel` quantity {over} exceeds the supported maximum of {MAX_QUANTITY}"))
+            );
+        }
+    }
+
+    #[test]
     fn feasibility_expansion_and_geometry_helpers_cover_rotation_paths() {
         let feasible = sample_problem();
         feasible.validate().expect("sample input should validate");

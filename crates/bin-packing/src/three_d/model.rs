@@ -780,21 +780,40 @@ mod tests {
 
     #[test]
     fn validate_rejects_zero_dimension_bin() {
-        let problem = ThreeDProblem {
-            bins: vec![sample_bin("b", 0, 10, 10)],
-            demands: vec![sample_demand("a", 1, 1, 1, 1)],
-        };
-        assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(_))));
+        for (width, height, depth) in [(0, 10, 10), (10, 0, 10), (10, 10, 0)] {
+            let mut problem = ThreeDProblem {
+                bins: vec![sample_bin("b", width, height, depth)],
+                demands: vec![sample_demand("a", 1, 1, 1, 1)],
+            };
+            assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(reason))
+                if reason == "bin `b` must have positive width, height, and depth"));
+            problem.bins[0] = sample_bin("b", 10, 10, 10);
+            problem.demands[0] = sample_demand("a", width, height, depth, 1);
+            assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(reason))
+                if reason == "demand `a` must have positive width, height, and depth"));
+            problem.demands[0] = sample_demand("a", 1, 1, 1, 1);
+            problem.validate().expect("all dimensions positive");
+        }
     }
 
     #[test]
     fn validate_rejects_oversized_dimension() {
         let oversize = MAX_DIMENSION_3D + 1;
-        let problem = ThreeDProblem {
-            bins: vec![sample_bin("b", oversize, 10, 10)],
-            demands: vec![sample_demand("a", 1, 1, 1, 1)],
-        };
-        assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(_))));
+        for (width, height, depth) in [(oversize, 10, 10), (10, oversize, 10), (10, 10, oversize)] {
+            let mut problem = ThreeDProblem {
+                bins: vec![sample_bin("b", width, height, depth)],
+                demands: vec![sample_demand("a", 1, 1, 1, 1)],
+            };
+            assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(reason))
+                if reason.contains("bin `b` dimensions exceed")));
+            problem.bins[0] = sample_bin("b", MAX_DIMENSION_3D, MAX_DIMENSION_3D, MAX_DIMENSION_3D);
+            problem.demands[0] = sample_demand("a", width, height, depth, 1);
+            assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(reason))
+                if reason.contains("demand `a` dimensions exceed")));
+            problem.demands[0] =
+                sample_demand("a", MAX_DIMENSION_3D, MAX_DIMENSION_3D, MAX_DIMENSION_3D, 1);
+            problem.validate().expect("inclusive per-axis maximum");
+        }
     }
 
     #[test]
@@ -822,6 +841,16 @@ mod tests {
             demands: vec![sample_demand("a", 1, 1, 1, 0)],
         };
         assert!(matches!(problem.validate(), Err(crate::BinPackingError::InvalidInput(_))));
+        let mut boundary = problem;
+        boundary.demands[0].quantity = MAX_QUANTITY;
+        boundary.validate().expect("inclusive quantity maximum without expansion");
+        if let Some(excess) = MAX_QUANTITY.checked_add(1) {
+            boundary.demands[0].quantity = excess;
+            assert!(
+                matches!(boundary.validate(), Err(crate::BinPackingError::InvalidInput(reason))
+                if reason.contains("quantity") && reason.contains("exceeds"))
+            );
+        }
     }
 
     #[test]

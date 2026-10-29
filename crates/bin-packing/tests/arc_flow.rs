@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use bin_packing::one_d::{
     CutDemand1D, OneDAlgorithm, OneDOptions, OneDProblem, OneDSolution, Stock1D, solve_1d,
-    solve_1d_arc_flow,
+    solve_1d_arc_flow, solve_1d_min_cost,
 };
 
 fn stock(name: &str, length: u32, available: Option<usize>) -> Stock1D {
@@ -13,6 +13,24 @@ fn stock(name: &str, length: u32, available: Option<usize>) -> Stock1D {
 
 fn demand(name: &str, length: u32, quantity: usize) -> CutDemand1D {
     CutDemand1D { name: name.into(), length, quantity }
+}
+
+#[test]
+fn min_cost_can_choose_more_bars_to_reduce_material_cost() {
+    let mut expensive = stock("large", 10, None);
+    expensive.cost = 10.0;
+    let problem = OneDProblem {
+        stock: vec![expensive, stock("small", 5, None)],
+        demands: vec![demand("part", 5, 2)],
+    };
+    let count_first =
+        solve_1d_arc_flow(problem.clone(), OneDOptions::default()).expect("count-first search");
+    assert_eq!((count_first.stock_count, count_first.total_cost), (1, 10.0));
+    let cost_first =
+        solve_1d_min_cost(problem.clone(), OneDOptions::default()).expect("cost-first search");
+    check(&problem, &cost_first);
+    assert_eq!((cost_first.stock_count, cost_first.total_cost), (2, 2.0));
+    assert!(cost_first.exact);
 }
 
 fn check(problem: &OneDProblem, solution: &OneDSolution) {
@@ -109,6 +127,10 @@ fn arc_flow_preserves_duplicate_names_kerf_trim_and_cost() {
 
 // Independent oracle assigns individual pieces to bars, without pattern enumeration or a DAG.
 fn oracle(problem: &OneDProblem) -> (usize, usize, u64, f64) {
+    oracle_with_objective(problem, false)
+}
+
+fn oracle_with_objective(problem: &OneDProblem, cost_first: bool) -> (usize, usize, u64, f64) {
     fn visit(
         problem: &OneDProblem,
         pieces: &[u32],
@@ -116,9 +138,10 @@ fn oracle(problem: &OneDProblem) -> (usize, usize, u64, f64) {
         usage: &mut [usize],
         missing: usize,
         best: &mut (usize, usize, u64, f64),
+        cost_first: bool,
     ) {
         let Some((&piece, tail)) = pieces.split_first() else {
-            let waste = bars
+            let waste: u64 = bars
                 .iter()
                 .map(|&(s, used)| u64::from(problem.stock[s].length - problem.stock[s].trim - used))
                 .sum();
@@ -129,7 +152,17 @@ fn oracle(problem: &OneDProblem) -> (usize, usize, u64, f64) {
             let cost: f64 = ordered.iter().map(|&(s, _)| problem.stock[s].cost).sum();
             let prefix = (missing, bars.len(), waste);
             let best_prefix = (best.0, best.1, best.2);
-            if prefix < best_prefix || (prefix == best_prefix && cost.total_cmp(&best.3).is_lt()) {
+            let improves = if cost_first {
+                missing
+                    .cmp(&best.0)
+                    .then_with(|| cost.total_cmp(&best.3))
+                    .then_with(|| bars.len().cmp(&best.1))
+                    .then_with(|| waste.cmp(&best.2))
+                    .is_lt()
+            } else {
+                prefix < best_prefix || (prefix == best_prefix && cost.total_cmp(&best.3).is_lt())
+            };
+            if improves {
                 *best = (missing, bars.len(), waste, cost);
             }
             return;
@@ -140,7 +173,7 @@ fn oracle(problem: &OneDProblem) -> (usize, usize, u64, f64) {
             if next <= source.length - source.trim {
                 let mut next_bars = bars.clone();
                 next_bars[index].1 = next;
-                visit(problem, tail, &mut next_bars, usage, missing, best);
+                visit(problem, tail, &mut next_bars, usage, missing, best, cost_first);
             }
         }
         for (s, source) in problem.stock.iter().enumerate() {
@@ -149,18 +182,91 @@ fn oracle(problem: &OneDProblem) -> (usize, usize, u64, f64) {
             {
                 bars.push((s, piece));
                 usage[s] += 1;
-                visit(problem, tail, bars, usage, missing, best);
+                visit(problem, tail, bars, usage, missing, best, cost_first);
                 usage[s] -= 1;
                 assert!(bars.pop().is_some());
             }
         }
-        visit(problem, tail, bars, usage, missing + 1, best);
+        visit(problem, tail, bars, usage, missing + 1, best, cost_first);
     }
     let pieces: Vec<_> =
         problem.demands.iter().flat_map(|d| std::iter::repeat_n(d.length, d.quantity)).collect();
     let mut best = (usize::MAX, usize::MAX, u64::MAX, f64::INFINITY);
-    visit(problem, &pieces, &mut Vec::new(), &mut vec![0; problem.stock.len()], 0, &mut best);
+    visit(
+        problem,
+        &pieces,
+        &mut Vec::new(),
+        &mut vec![0; problem.stock.len()],
+        0,
+        &mut best,
+        cost_first,
+    );
     best
+}
+
+#[test]
+fn min_cost_matches_tiny_per_piece_oracle() {
+    for seed in 0..48_u32 {
+        let mut first = stock("first", 7 + seed % 3, Some((seed % 3) as usize));
+        first.kerf = seed % 2;
+        first.trim = (seed / 2) % 2;
+        first.cost = if seed % 7 == 0 {
+            0.0
+        } else if seed % 2 == 0 {
+            3.0
+        } else {
+            0.1
+        };
+        let mut second = stock("second", 5 + seed % 4, Some(((seed / 3) % 3) as usize));
+        second.kerf = (seed / 4) % 2;
+        second.cost = if seed % 2 == 0 { 1.0 } else { 0.2 };
+        let problem = OneDProblem {
+            stock: vec![first, second],
+            demands: vec![demand("same", 1 + seed % 4, 2), demand("same", 3, 2)],
+        };
+        let result = solve_1d_min_cost(
+            problem.clone(),
+            OneDOptions { multistart_runs: 1, ..OneDOptions::default() },
+        )
+        .expect("cost-first solve");
+        check(&problem, &result);
+        assert!(result.exact, "seed {seed}: {:?}", result.metrics);
+        assert_eq!(
+            (result.unplaced.len(), result.stock_count, result.total_waste, result.total_cost),
+            oracle_with_objective(&problem, true),
+            "seed {seed}"
+        );
+    }
+}
+
+#[test]
+fn min_cost_zero_budget_keeps_incumbent_without_exactness_claim() {
+    let mut costly = stock("large", 10, None);
+    costly.cost = 10.0;
+    let problem = OneDProblem {
+        stock: vec![costly, stock("small", 5, None)],
+        demands: vec![demand("part", 5, 2)],
+    };
+    let result = solve_1d_min_cost(
+        problem.clone(),
+        OneDOptions { exact_pattern_limit: 0, ..OneDOptions::default() },
+    )
+    .expect("retained incumbent");
+    check(&problem, &result);
+    assert!(!result.exact);
+    assert_eq!((result.stock_count, result.total_cost), (1, 10.0));
+    assert_eq!(result.algorithm, "arc_flow_min_cost");
+}
+
+#[test]
+fn min_cost_rejects_unrepresentable_aggregate_material_cost() {
+    let mut expensive = stock("expensive", 10, None);
+    expensive.cost = f64::MAX;
+    let problem = OneDProblem { stock: vec![expensive], demands: vec![demand("cut", 6, 2)] };
+    assert!(matches!(
+        solve_1d_min_cost(problem, OneDOptions::default()),
+        Err(bin_packing::BinPackingError::InvalidConstraint { .. })
+    ));
 }
 
 #[test]

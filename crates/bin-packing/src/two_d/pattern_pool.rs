@@ -525,6 +525,33 @@ mod tests {
     }
 
     #[test]
+    fn checked_patterns_enforce_rotation_bounds_and_quantity() {
+        let mut input = problem();
+        input.demands[0].can_rotate = true;
+        let mut rotated = placement("0", 0, 0, 10, 5);
+        rotated.rotated = true;
+        assert_eq!(checked_counts(&input, 0, &[rotated.clone()]), Some(vec![1, 0]));
+        input.demands[0].can_rotate = false;
+        assert!(checked_counts(&input, 0, &[rotated]).is_none());
+        assert!(checked_counts(&input, 0, &[]).is_none());
+        assert!(checked_counts(&input, 0, &[placement("2", 0, 0, 5, 10)]).is_none());
+        assert!(checked_counts(&input, 0, &[placement("0", 6, 0, 5, 10)]).is_none());
+        assert!(checked_counts(&input, 0, &[placement("1", 0, 6, 10, 5)]).is_none());
+        input.demands[0].quantity = 1;
+        assert_eq!(checked_counts(&input, 0, &[placement("0", 0, 0, 5, 10)]), Some(vec![1, 0]));
+        assert!(
+            checked_counts(&input, 0, &[placement("0", 0, 0, 5, 10), placement("0", 5, 0, 5, 10)])
+                .is_none()
+        );
+        input.demands[0].quantity = 2;
+        input.sheets[0].kerf = 1;
+        assert!(
+            checked_counts(&input, 0, &[placement("0", 0, 0, 5, 10), placement("0", 5, 0, 5, 10)])
+                .is_none()
+        );
+    }
+
+    #[test]
     fn guillotine_pool_keeps_cuttable_layouts() {
         let result = solve_2d_recombined(
             problem(),
@@ -600,6 +627,106 @@ mod tests {
             Some("pattern recombination skipped: input cap")
         );
         assert_eq!(result, baseline);
+    }
+
+    #[test]
+    fn terra_batch2_demand_type_cap_falls_back_with_accounting() {
+        let mut input = problem();
+        input.demands = (0..17)
+            .map(|i| RectDemand2D {
+                name: format!("piece-{i}"),
+                width: 1,
+                height: 1,
+                quantity: 1,
+                can_rotate: false,
+            })
+            .collect();
+        let result = solve_2d_recombined(input, TwoDOptions::default()).expect("fallback");
+        assert!(
+            result.metrics.notes.iter().any(|n| n == "pattern recombination skipped: input cap")
+        );
+        assert!(result.unplaced.is_empty());
+        let mut names = result
+            .layouts
+            .iter()
+            .flat_map(|l| &l.placements)
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
+        names.sort();
+        let mut expected = (0..17).map(|i| format!("piece-{i}")).collect::<Vec<_>>();
+        expected.sort();
+        assert_eq!(names, expected);
+    }
+
+    #[test]
+    fn terra_batch2_stock_type_cap_falls_back_with_finite_inventory() {
+        let mut input = problem();
+        input.sheets = (0..17)
+            .map(|i| Sheet2D {
+                name: format!("sheet-{i}"),
+                width: 1,
+                height: 1,
+                cost: 1.0,
+                quantity: Some(1),
+                kerf: 0,
+                edge_kerf_relief: false,
+            })
+            .collect();
+        input.demands.truncate(1);
+        input.demands[0].width = 1;
+        input.demands[0].height = 1;
+        input.demands[0].quantity = 18;
+        let result = solve_2d_recombined(input, TwoDOptions::default()).expect("fallback");
+        assert!(
+            result.metrics.notes.iter().any(|n| n == "pattern recombination skipped: input cap")
+        );
+        assert_eq!(result.sheet_count, 17);
+        assert_eq!(result.layouts.iter().map(|l| l.placements.len()).sum::<usize>(), 17);
+        assert_eq!(result.unplaced.iter().map(|d| d.quantity).sum::<usize>(), 1);
+        let mut names = result.layouts.iter().map(|l| l.sheet_name.as_str()).collect::<Vec<_>>();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), 17);
+    }
+
+    #[test]
+    fn terra_batch2_hard_piece_limit_accepts_128_and_rejects_129() {
+        let mut input = problem();
+        input.sheets[0].width = 1;
+        input.sheets[0].height = 1;
+        input.sheets[0].quantity = Some(1);
+        input.demands.truncate(1);
+        input.demands[0].width = 1;
+        input.demands[0].height = 1;
+        input.demands[0].quantity = 128;
+        let result =
+            solve_2d_recombined(input.clone(), TwoDOptions::default()).expect("128 pieces");
+        assert_eq!(result.layouts.iter().map(|l| l.placements.len()).sum::<usize>(), 1);
+        assert_eq!(result.unplaced.iter().map(|d| d.quantity).sum::<usize>(), 127);
+        input.demands[0].quantity = 129;
+        assert!(matches!(solve_2d_recombined(input, TwoDOptions::default()),
+            Err(BinPackingError::Unsupported(message)) if message == "pattern recombination supports at most 128 pieces, including Auto fallback"));
+    }
+
+    #[test]
+    fn terra_batch2_control_limit_rejects_33_with_specific_error() {
+        for options in [
+            TwoDOptions { beam_width: 33, ..Default::default() },
+            TwoDOptions { multistart_runs: 33, ..Default::default() },
+        ] {
+            assert!(matches!(solve_2d_recombined(problem(), options),
+                Err(BinPackingError::Unsupported(message)) if message == "pattern recombination requires beam width and multistart runs at most 32"));
+        }
+        let mut input = problem();
+        input.demands.truncate(1);
+        input.demands[0].quantity = 1;
+        let result = solve_2d_recombined(
+            input,
+            TwoDOptions { beam_width: 32, multistart_runs: 32, ..Default::default() },
+        )
+        .expect("limits are inclusive");
+        assert!(result.unplaced.is_empty());
+        assert_eq!(result.layouts.iter().map(|l| l.placements.len()).sum::<usize>(), 1);
     }
 
     #[test]

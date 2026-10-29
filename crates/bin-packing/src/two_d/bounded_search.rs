@@ -173,3 +173,173 @@ pub(super) fn demand_aware(problem: TwoDProblem, mut options: TwoDOptions) -> Re
     }
     restore(&problem, &indexed, best)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::two_d::{Placement2D, RectDemand2D, Sheet2D, SolverMetrics2D};
+
+    fn fixture() -> (TwoDProblem, TwoDSolution) {
+        let problem = TwoDProblem {
+            sheets: vec![Sheet2D {
+                name: "stock".into(),
+                width: 12,
+                height: 10,
+                cost: 1.0,
+                quantity: Some(1),
+                kerf: 1,
+                edge_kerf_relief: false,
+            }],
+            demands: vec![RectDemand2D {
+                name: "part".into(),
+                width: 3,
+                height: 2,
+                quantity: 2,
+                can_rotate: true,
+            }],
+        };
+        let placements = vec![
+            Placement2D { name: "part".into(), x: 0, y: 0, width: 3, height: 2, rotated: false },
+            Placement2D { name: "part".into(), x: 4, y: 0, width: 3, height: 2, rotated: false },
+        ];
+        let solution = TwoDSolution::from_layouts(
+            "fixture",
+            false,
+            &problem.sheets,
+            vec![(0, placements)],
+            Vec::new(),
+            SolverMetrics2D { iterations: 0, explored_states: 0, notes: Vec::new() },
+            0,
+        );
+        (problem, solution)
+    }
+
+    fn rejected(problem: &TwoDProblem, solution: &TwoDSolution) {
+        assert!(
+            matches!(validate_solution(problem, solution), Err(BinPackingError::Unsupported(reason)) if reason == "experimental candidate failed independent layout validation")
+        );
+    }
+
+    #[test]
+    fn validator_rejects_forged_layouts_and_preserves_valid_rotation_and_gap() {
+        let (problem, valid) = fixture();
+        assert!(validate_solution(&problem, &valid).is_ok());
+        let mut rotated = valid.clone();
+        rotated.layouts[0].placements[0].rotated = true;
+        rotated.layouts[0].placements[0].width = 2;
+        rotated.layouts[0].placements[0].height = 3;
+        assert!(validate_solution(&problem, &rotated).is_ok());
+        let mut cases = Vec::new();
+        let mut bad = valid.clone();
+        bad.layouts[0].sheet_name = "unknown".into();
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts[0].width += 1;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts.push(bad.layouts[0].clone());
+        bad.sheet_count = 2;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts[0].placements[0].name = "unknown".into();
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts[0].placements[0].width += 1;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts[0].placements[0].x = 10;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts[0].placements[0].y = 9;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.layouts[0].placements[1].x = 3;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        bad.sheet_count = 0;
+        cases.push(bad);
+        let mut bad = valid.clone();
+        assert!(bad.layouts[0].placements.pop().is_some());
+        cases.push(bad);
+        for bad in cases {
+            rejected(&problem, &bad);
+        }
+        let mut no_rotation = problem.clone();
+        no_rotation.demands[0].can_rotate = false;
+        rejected(&no_rotation, &rotated);
+    }
+
+    #[test]
+    fn validator_checks_unplaced_source_identity_and_conservation() {
+        let (problem, mut partial) = fixture();
+        assert!(partial.layouts[0].placements.pop().is_some());
+        let mut missing = problem.demands[0].clone();
+        missing.quantity = 1;
+        partial.unplaced.push(missing);
+        assert!(validate_solution(&problem, &partial).is_ok());
+        let mut cases = Vec::new();
+        let mut bad = partial.clone();
+        bad.unplaced[0].name = "unknown".into();
+        cases.push(bad);
+        let mut bad = partial.clone();
+        bad.unplaced[0].width += 1;
+        cases.push(bad);
+        let mut bad = partial.clone();
+        bad.unplaced[0].height += 1;
+        cases.push(bad);
+        let mut bad = partial.clone();
+        bad.unplaced[0].can_rotate = false;
+        cases.push(bad);
+        let mut bad = partial.clone();
+        bad.unplaced[0].quantity = 2;
+        cases.push(bad);
+        for bad in cases {
+            rejected(&problem, &bad);
+        }
+    }
+
+    #[test]
+    fn prepare_enforces_independent_resource_limits_and_inclusive_controls() {
+        let (base, _) = fixture();
+        let options = TwoDOptions::default();
+        for axis in 0..4 {
+            let mut problem = base.clone();
+            match axis {
+                0 => problem.demands[0].quantity = 129,
+                1 => {
+                    problem.demands = (0..65)
+                        .map(|i| RectDemand2D {
+                            name: format!("d{i}"),
+                            quantity: 1,
+                            can_rotate: false,
+                            ..base.demands[0].clone()
+                        })
+                        .collect()
+                }
+                2 => {
+                    problem.sheets = (0..9)
+                        .map(|i| Sheet2D { name: format!("s{i}"), ..base.sheets[0].clone() })
+                        .collect()
+                }
+                _ => {
+                    problem.demands = (0..9)
+                        .map(|i| RectDemand2D { name: format!("d{i}"), ..base.demands[0].clone() })
+                        .collect()
+                }
+            }
+            assert!(
+                matches!(prepare(&problem, &options), Err(BinPackingError::Unsupported(reason)) if reason == "bounded 2D search supports at most 128 parts, 64 demands, 8 stocks and 8 rotatable types")
+            );
+        }
+        for (beam_width, multistart_runs) in [(0, 1), (33, 1), (1, 0), (1, 17)] {
+            let options = TwoDOptions { beam_width, multistart_runs, ..Default::default() };
+            assert!(
+                matches!(prepare(&base, &options), Err(BinPackingError::Unsupported(reason)) if reason == "bounded 2D search requires beam width 1..=32 and multistart runs 1..=16")
+            );
+        }
+        for (beam_width, multistart_runs) in [(1, 1), (32, 16)] {
+            let options = TwoDOptions { beam_width, multistart_runs, ..Default::default() };
+            assert!(prepare(&base, &options).is_ok());
+        }
+    }
+}
