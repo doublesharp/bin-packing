@@ -627,6 +627,13 @@ pub(super) fn prepare_shape(
         }
         let polygon = Polygon::new(outer, holes);
         polygon.check_validation().map_err(|error| constraint("shape", error.to_string()))?;
+        if polygon
+            .interiors()
+            .iter()
+            .any(|hole| Euclidean.distance(polygon.exterior(), hole) == 0.0)
+        {
+            return Err(constraint("shape", "holes must be strictly inside their exterior"));
+        }
         if area <= 0.0 || !area.is_finite() {
             return Err(constraint("shape", "holes must leave positive material area"));
         }

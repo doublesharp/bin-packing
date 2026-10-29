@@ -993,6 +993,59 @@ mod tests {
     }
 
     #[test]
+    fn polygon_holes_must_be_strictly_inside_their_exterior() {
+        let mut cases = Vec::new();
+        for hole_x in [0.0, 0.000001, 0.25] {
+            cases.push((
+                vec![
+                    Point2D { x: hole_x, y: 2.0 },
+                    Point2D { x: 1.0, y: 1.0 },
+                    Point2D { x: 2.0, y: 2.0 },
+                    Point2D { x: 1.0, y: 3.0 },
+                ],
+                hole_x > 0.0,
+            ));
+        }
+        cases.push((
+            vec![
+                Point2D { x: 0.0, y: 1.0 },
+                Point2D { x: 1.0, y: 1.0 },
+                Point2D { x: 1.0, y: 3.0 },
+                Point2D { x: 0.0, y: 3.0 },
+            ],
+            false,
+        ));
+        for (vertices, strictly_inside) in cases {
+            let mut shape = rectangle(4.0, 4.0);
+            shape.components[0].holes.push(Contour2D::Polygon { vertices });
+            for hole_on_bin in [false, true] {
+                let problem = if hole_on_bin {
+                    IrregularProblem {
+                        bins: vec![bin(shape.clone())],
+                        demands: vec![fixed_demand(rectangle(0.5, 0.5), 1)],
+                    }
+                } else {
+                    IrregularProblem {
+                        bins: vec![bin(rectangle(5.0, 5.0))],
+                        demands: vec![fixed_demand(shape.clone(), 1)],
+                    }
+                };
+                let result = solve_irregular(problem.clone(), IrregularOptions::default());
+                if !strictly_inside {
+                    assert!(
+                        matches!(result, Err(crate::BinPackingError::InvalidConstraint { .. })),
+                        "a source hole touching its exterior must be rejected"
+                    );
+                } else {
+                    let result = result.expect("strictly interior polygon hole");
+                    assert!(result.feasible);
+                    validate_irregular(&problem, &result).expect("strict hole readback");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn circular_holes_and_rigid_components_reject_uncertain_separation() {
         for gap in [0.03125, 0.125] {
             let mut annulus = circle(0.0, 0.0, 3.0);

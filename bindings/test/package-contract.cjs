@@ -235,6 +235,14 @@ function extendedContract(api,dimensions,results) {
     mustReject(()=>api.solveIrregular(problem,{item_spacing:Infinity}),'non-finite irregular controls must fail',/finite/);
     const bad={...problem,bins:[{...problem.bins[0],spacing:NaN}]};
     mustReject(()=>api.solveIrregular(bad),'non-finite irregular material spacing must fail',/finite/);
+    const touching=shape([[0,0],[4,0],[4,4],[0,4]]);
+    touching.components[0].holes=[{kind:'polygon',vertices:[[0,2],[1,1],[2,2],[1,3]].map(([x,y])=>({x,y}))}];
+    const outside=shape([[0,0],[10,0],[10,10],[0,10]]);
+    const part=shape([[0,0],[1,0],[1,1],[0,1]]);
+    mustReject(()=>api.solveIrregular({bins:[{name:'stock',shape:outside}],demands:[{name:'touching',shape:touching,quantity:1}]}),
+      'a source hole touching its exterior at a point must fail',/strictly inside/);
+    mustReject(()=>api.solveIrregular({bins:[{name:'touching',shape:touching}],demands:[{name:'part',shape:part,quantity:1}]}),
+      'a stock hole touching its exterior at a point must fail',/strictly inside/);
   }
 }
 function packageContract(api, dimensions=[1,2,3,'irregular']) {
