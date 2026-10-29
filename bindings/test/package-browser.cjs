@@ -5,7 +5,7 @@ const path=require('node:path');
 async function main() {
   const {chromium}=require(process.argv[2]||'playwright');
   const routes={'/':null};
-  for(const variant of ['combined','one-d','two-d','three-d'])for(const file of ['bin_packing_wasm.js','bin_packing_wasm_bg.wasm'])
+  for(const variant of ['combined','one-d','two-d','three-d','irregular'])for(const file of ['bin_packing_wasm.js','bin_packing_wasm_bg.wasm'])
     routes[`/${variant}/${file}`]=path.join(__dirname,`../wasm/dist/${variant==='combined'?'':variant+'/'}web/${file}`);
   const server=createServer(async(req,res)=>{
     try {
@@ -21,7 +21,7 @@ async function main() {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.addScriptTag({content:await readFile(path.join(__dirname,'package-contract.cjs'),'utf8')});
     const results=[];
-    for(const [variant,dimensions]of [['combined',[1,2,3]],['one-d',[1]],['two-d',[2]],['three-d',[3]]]) {
+    for(const [variant,dimensions]of [['combined',[1,2,3,'irregular']],['one-d',[1]],['two-d',[2]],['three-d',[3]],['irregular',['irregular']]]) {
       results.push(await page.evaluate(async({variant,dimensions})=>{
         const api=await import(`/${variant}/bin_packing_wasm.js`);await api.default();
         packageContract(api,dimensions);return {variant,dimensions,result:'passed'};

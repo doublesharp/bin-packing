@@ -1,14 +1,13 @@
 //! Cut sequencing and step generation for finished layouts.
 //!
 //! Cut planning is a post-processor on solver output: given an
-//! [`OneDSolution`](crate::one_d::OneDSolution) or
-//! [`TwoDSolution`](crate::two_d::TwoDSolution), produce an ordered
+//! `one_d::OneDSolution` or `two_d::TwoDSolution`, produce an ordered
 //! sequence of cuts that a shop operator can execute, scored against a
 //! preset cost model.
 //!
 //! Entry points:
-//! - [`crate::one_d::cut_plan::plan_cuts`]
-//! - [`crate::two_d::cut_plan::plan_cuts`]
+//! - `one_d::cut_plan::plan_cuts` (the `one-d` feature).
+//! - `two_d::cut_plan::plan_cuts` (the `two-d` feature).
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

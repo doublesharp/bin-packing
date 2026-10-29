@@ -149,3 +149,51 @@ export function plan1dCuts(
 
 /** Return the package version string. */
 export function version(): string;
+/** Bounded cost-first search; exact certifies the selected material-cost objective. */
+export function solve1dMinCost(problem: OneDProblem, options?: OneDOptions | null): OneDSolution;
+
+/** Native explicit objectives. Bounds certify only the primary objective. */
+export type PackingObjective = 'bin_count' | 'total_cost' | 'knapsack' | 'feasibility'
+  | 'open_dimension_x' | 'open_dimension_y' | 'open_dimension_z' | 'open_dimension_xy';
+export interface OptimizationProblem<P> {
+  packing: P;
+  /** Finite nonnegative value per source demand; empty defaults to one. */
+  profits?: number[];
+  /** Mandatory source copies under knapsack; empty defaults to zero. */
+  minimum_quantities?: number[];
+}
+export interface OptimizationOptions {
+  objective?: PackingObjective;
+  max_evaluations?: number;
+  packing_max_states?: number;
+  beam_width?: number;
+  /** Nonnegative JavaScript safe integer. */
+  seed?: number;
+}
+export interface OptimizationReport {
+  objective: PackingObjective;
+  complete: boolean;
+  minimums_satisfied: boolean;
+  selected_quantities: number[];
+  total_profit: number;
+  evaluations: number;
+  packing_states: number;
+  search_truncated: boolean;
+  open_extents: number[];
+  primary_value: number;
+  primary_bound: number | null;
+  bound_is_upper: boolean;
+  primary_optimal: boolean;
+}
+export interface OptimizedSolution<S, P> {
+  effective_problem: P;
+  solution: S;
+  stock_indices: number[];
+  demand_indices: number[][];
+  report: OptimizationReport;
+}
+
+export type OptimizationProblem1D = OptimizationProblem<OneDProblem>;
+export type OptimizedSolution1D = OptimizedSolution<OneDSolution, OneDProblem>;
+/** Optimize profit, material, feasibility or open X with source provenance. */
+export function solve1dOptimized(problem: OptimizationProblem1D, options?: OptimizationOptions | null): OptimizedSolution1D;

@@ -1,20 +1,28 @@
 //! Cut list optimization and bin packing for 1D (linear stock), 2D (sheet
-//! stock), and 3D (box) problems.
+//! stock), 3D (box), and irregular nesting problems.
 //!
-//! The crate exposes three shipping entry points by default:
+//! Default features expose these primary entry points:
 //!
-//! - [`one_d::solve_1d`] — cutting stock / linear bin packing. Supports first-fit
+//! - `one_d::solve_1d` — cutting stock / linear bin packing. Supports first-fit
 //!   decreasing, best-fit decreasing, multistart local search, and an exact
 //!   column-generation backend that reports an LP lower bound.
-//! - [`two_d::solve_2d`] — rectangular sheet packing. Supports the MaxRects family
+//! - `two_d::solve_2d` — rectangular sheet packing. Supports the MaxRects family
 //!   (best-area, best-short-side-fit, best-long-side-fit, bottom-left, contact-point),
 //!   the Skyline family (default and minimum-waste), Guillotine beam search with
 //!   configurable ranking and split rules (best-short-side-fit, best-long-side-fit,
 //!   shorter- and longer-leftover-axis, min- and max-area splits), shelf heuristics
 //!   (NFDH, FFDH, BFDH), and a multistart meta-strategy.
-//! - [`three_d::solve_3d`] — rectangular box packing. Supports Extreme Points,
+//! - `three_d::solve_3d` — rectangular box packing. Supports Extreme Points,
 //!   Guillotine 3D, layer/wall/column builders, DBLF, volume-sorted baselines,
 //!   randomized meta-strategies, and a restricted exact backend.
+//! - `irregular::solve_irregular` — concave polygons, holes, circular contours,
+//!   legal rotations/reflection, rigid components, irregular bins and spacing.
+//!
+//! Each dimension also provides explicit material/profit/feasibility/open-size
+//! optimization. `two_d::staged` produces physical guillotine cut trees with
+//! machine restrictions; `three_d::loading` enforces nested-column loading,
+//! weight, axle and unloading rules. Their independent validators reconstruct
+//! the geometry and source quantities. Bounded search is explicitly heuristic.
 //!
 //! The `three-d` feature (enabled by default) provides the 3D rectangular box
 //! packing module with a 29-algorithm catalog. The legacy `three-d-preview`
@@ -27,13 +35,13 @@
 //! Additional capabilities:
 //!
 //! - Multiple stock / sheet types per problem, each with its own cost and optional
-//!   inventory cap. When 1D inventory caps are present, [`one_d::solve_1d`] also
+//!   inventory cap. When 1D inventory caps are present, `one_d::solve_1d` also
 //!   reports a relaxed-inventory procurement estimate per stock type.
 //! - Per-item rotation control for 2D demands, plus a `guillotine_required` flag
 //!   that restricts the solver to guillotine-compatible layouts.
 //! - Kerf and trim modeling for 1D cuts so layouts match physical cut lists.
 //! - Reproducible randomized search via an optional `seed`.
-//! - Automatic multi-core parallelism via [`rayon`] when the `parallel` feature
+//! - Automatic multi-core parallelism via `rayon` when the `parallel` feature
 //!   is enabled (on by default). Auto-mode solvers dispatch algorithms in
 //!   parallel and multi-start / GRASP / local-search meta-strategies run their
 //!   iterations concurrently. Falls back to sequential execution on single-core
@@ -114,8 +122,11 @@
 
 pub mod cut_plan;
 mod error;
+#[cfg(feature = "irregular")]
+pub mod irregular;
 #[cfg(feature = "one-d")]
 pub mod one_d;
+pub mod optimization;
 #[cfg(any(feature = "one-d", feature = "two-d", feature = "three-d"))]
 mod parallel;
 #[cfg(feature = "two-d")]

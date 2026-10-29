@@ -8,17 +8,25 @@ rust-version.workspace = true
 description = "Cut list optimization and bin packing library for 1D, 2D, and 3D stock problems"
 readme = "../../README.md"
 documentation = "https://docs.rs/bin-packing"
-keywords = ["bin-packing", "cutting-stock", "optimization", "packing", "algorithms"]
+keywords = [
+  "bin-packing",
+  "cutting-stock",
+  "optimization",
+  "packing",
+  "algorithms",
+]
 categories = ["algorithms", "science"]
 
 [dependencies]
+geo = { workspace = true, optional = true }
 rand.workspace = true
 rayon = { workspace = true, optional = true }
 serde.workspace = true
 thiserror.workspace = true
 
 [features]
-default = ["one-d", "two-d", "three-d", "parallel"]
+default = ["one-d", "two-d", "three-d", "irregular", "parallel"]
+irregular = ["dep:geo"]
 one-d = []
 two-d = []
 three-d = ["two-d"]
@@ -69,3 +77,7 @@ required-features = ["two-d"]
 [[example]]
 name = "packing_experiment_bench"
 required-features = ["one-d", "two-d", "three-d"]
+
+[[example]]
+name = "packingsolver_compare"
+required-features = ["one-d", "two-d", "three-d", "irregular"]

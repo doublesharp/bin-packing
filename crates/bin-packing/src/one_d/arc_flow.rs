@@ -11,6 +11,35 @@ const MAX_TYPES: usize = 128;
 const MAX_DEPTH: usize = 128;
 const MAX_INPUT_QUANTITY: usize = 4096;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Objective {
+    Count,
+    Cost,
+}
+
+impl Objective {
+    fn algorithm(self) -> &'static str {
+        match self {
+            Self::Count => "arc_flow",
+            Self::Cost => "arc_flow_min_cost",
+        }
+    }
+
+    fn is_better(self, candidate: &OneDSolution, incumbent: &OneDSolution) -> bool {
+        match self {
+            Self::Count => candidate.is_better_than(incumbent),
+            Self::Cost => candidate
+                .unplaced
+                .len()
+                .cmp(&incumbent.unplaced.len())
+                .then_with(|| candidate.total_cost.total_cmp(&incumbent.total_cost))
+                .then_with(|| candidate.stock_count.cmp(&incumbent.stock_count))
+                .then_with(|| candidate.total_waste.cmp(&incumbent.total_waste))
+                .is_lt(),
+        }
+    }
+}
+
 /// Solve a cutting-stock problem with compressed per-stock pattern DAGs.
 ///
 /// The integer search minimizes unplaced cuts, then bar count, unused usable
@@ -42,6 +71,14 @@ const MAX_INPUT_QUANTITY: usize = 4096;
 /// Returns the same input validation and feasibility errors as [`super::solve_1d`],
 /// or [`BinPackingError::Unsupported`] when an input cardinality limit is exceeded.
 pub fn solve_1d_arc_flow(problem: OneDProblem, options: OneDOptions) -> Result<OneDSolution> {
+    solve_with_objective(problem, options, Objective::Count)
+}
+
+fn solve_with_objective(
+    problem: OneDProblem,
+    options: OneDOptions,
+    objective: Objective,
+) -> Result<OneDSolution> {
     problem.validate()?;
     if problem.demands.len() > MAX_TYPES
         || problem.stock.len() > MAX_TYPES
@@ -52,12 +89,23 @@ pub fn solve_1d_arc_flow(problem: OneDProblem, options: OneDOptions) -> Result<O
                 .into(),
         ));
     }
+    if objective == Objective::Cost
+        && problem
+            .stock
+            .iter()
+            .any(|stock| !(stock.cost * (problem.total_quantity() + 1) as f64).is_finite())
+    {
+        return Err(BinPackingError::InvalidConstraint {
+            field: "stock.cost".into(),
+            reason: "aggregate material cost could overflow f64".into(),
+        });
+    }
     problem.ensure_feasible_demands()?;
     let incumbent_options = OneDOptions { algorithm: OneDAlgorithm::Auto, ..options.clone() };
     let mut incumbent = super::solve_1d(problem.clone(), incumbent_options)?;
     let required: Vec<_> =
         incumbent.stock_requirements.iter().map(|r| r.required_quantity).collect();
-    incumbent.algorithm = "arc_flow".into();
+    incumbent.algorithm = objective.algorithm().into();
     incumbent.exact = false;
     incumbent.lower_bound = None;
 
@@ -82,6 +130,7 @@ pub fn solve_1d_arc_flow(problem: OneDProblem, options: OneDOptions) -> Result<O
     });
 
     let mut search = Search {
+        objective,
         problem: &problem,
         graphs: &graphs,
         incumbent,
@@ -102,7 +151,7 @@ pub fn solve_1d_arc_flow(problem: OneDProblem, options: OneDOptions) -> Result<O
         search.visit()?;
     }
     let exact = search.truncated.is_none();
-    let notes = vec![
+    let mut notes = vec![
         format!(
             "arc-flow graph_nodes={} graph_arcs={} represented_patterns={} graph_storage_bytes={} (saturating path count; storage excludes allocator and build-map overhead)",
             stats.nodes, stats.arcs, stats.patterns, stats.bytes
@@ -121,6 +170,9 @@ pub fn solve_1d_arc_flow(problem: OneDProblem, options: OneDOptions) -> Result<O
             None => "arc-flow complete integer search; lexicographic optimum certified".into(),
         },
     ];
+    if objective == Objective::Cost {
+        notes.push("cost-first search: unplaced count, material cost, bar count, waste; procurement quantities remain count-first relaxed-inventory estimates".into());
+    }
     let mut solution = search.incumbent;
     solution.exact = exact;
     solution.metrics = SolverMetrics1D {
@@ -138,6 +190,26 @@ pub fn solve_1d_arc_flow(problem: OneDProblem, options: OneDOptions) -> Result<O
             .push("stock requirements estimated from a relaxed-inventory auto solve".into());
     }
     Ok(solution)
+}
+
+/// Minimize unplaced cuts, total material cost, bar count, then waste.
+///
+/// Uses the bounded multi-stock pattern search of [`solve_1d_arc_flow`]. Search
+/// controls, kerf, trim and inventory have the same meaning. `exact` certifies
+/// this cost-first objective only when the complete supported search finishes.
+/// `options.algorithm` is ignored; this entry point always uses pattern search.
+/// Existing count-first entry points are unchanged.
+/// The initial incumbent and procurement quantities use the existing count-first
+/// Auto solver. Procurement remains an estimate, rather than an optimal
+/// cost-first purchasing recommendation. The search does not prune by the
+/// count-first incumbent's bar count, so a cheaper solution may use more bars.
+/// Aggregate material costs must remain finite; conservative ceilings are
+/// validated before constructing the incumbent.
+///
+/// # Errors
+/// Returns validation, feasibility or bounded-search input errors.
+pub fn solve_1d_min_cost(problem: OneDProblem, options: OneDOptions) -> Result<OneDSolution> {
+    solve_with_objective(problem, options, Objective::Cost)
 }
 
 #[derive(Debug)]
@@ -318,6 +390,7 @@ struct State {
 }
 
 struct Search<'a> {
+    objective: Objective,
     problem: &'a OneDProblem,
     graphs: &'a [PatternDag],
     incumbent: OneDSolution,
@@ -346,20 +419,27 @@ impl Search<'_> {
         }
         self.states += 1;
         let missing: usize = self.remaining.iter().sum();
-        if (missing, self.path.len(), self.waste)
-            <= (
-                self.incumbent.unplaced.len(),
-                self.incumbent.stock_count,
-                self.incumbent.total_waste,
-            )
-        {
+        let consider = match self.objective {
+            Objective::Count => {
+                (missing, self.path.len(), self.waste)
+                    <= (
+                        self.incumbent.unplaced.len(),
+                        self.incumbent.stock_count,
+                        self.incumbent.total_waste,
+                    )
+            }
+            Objective::Cost => missing <= self.incumbent.unplaced.len(),
+        };
+        if consider {
             let candidate = self.solution()?;
-            if candidate.is_better_than(&self.incumbent) {
+            if self.objective.is_better(&candidate, &self.incumbent) {
                 self.incumbent = candidate;
             }
         }
         if missing == 0
-            || (self.incumbent.unplaced.is_empty() && self.path.len() >= self.incumbent.stock_count)
+            || (self.objective == Objective::Count
+                && self.incumbent.unplaced.is_empty()
+                && self.path.len() >= self.incumbent.stock_count)
         {
             return Ok(());
         }
@@ -456,7 +536,7 @@ impl Search<'_> {
             })
             .collect();
         Ok(OneDSolution::from_bins(
-            "arc_flow",
+            self.objective.algorithm(),
             false,
             None,
             &self.problem.stock,

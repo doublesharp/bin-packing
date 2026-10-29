@@ -611,3 +611,331 @@ export interface SawPlan2D {
 }
 /** Plan a physical saw job. Execute operations in order; sheet views are diagram references. */
 export function plan2dSawCuts(job: SawJob2D, options?: SawPlanOptions2D | null): SawPlan2D;
+
+/** Integer constraints in the sheet's original coordinate frame. */
+export interface Defect2D {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface SheetConstraints2D {
+  trim_left?: number;
+  trim_right?: number;
+  trim_top?: number;
+  trim_bottom?: number;
+  defects?: Defect2D[];
+}
+export interface ConstrainedProblem2D {
+  problem: TwoDProblem;
+  constraints?: SheetConstraints2D[];
+}
+export type PackingObjective2D = 'bin_count' | 'total_cost';
+export interface ConstrainedOptions2D {
+  objective?: PackingObjective2D;
+  beam_width?: number;
+  max_states?: number;
+}
+export interface ConstrainedSolution2D {
+  solution: TwoDSolution;
+  stock_indices: number[];
+  demand_indices: number[][];
+  explored_states: number;
+  search_truncated: boolean;
+}
+/** Trims/defects, finite inventory and count-first or cost-first construction. */
+export function solve2dConstrained(problem: ConstrainedProblem2D, options?: ConstrainedOptions2D | null): ConstrainedSolution2D;
+export interface AdaptiveOptions2D {
+  solver?: TwoDOptions;
+  max_candidates?: number;
+  stop_on_count_bound?: boolean;
+}
+export interface AdaptiveSolution2D {
+  solution: TwoDSolution;
+  lower_bound: number;
+  count_optimal: boolean;
+  candidates_run: number;
+  stopped_on_bound: boolean;
+  candidate_limit_reached: boolean;
+}
+/** A count certificate does not certify offcuts or other secondary metrics. */
+export function solve2dAdaptive(problem: TwoDProblem, options?: AdaptiveOptions2D | null): AdaptiveSolution2D;
+/** Conservative sheet-count bound, relaxing inventory and blade gaps. */
+export function lowerBound2d(problem: TwoDProblem): number;
+
+export interface ConstrainedProblem3D {
+  problem: ThreeDProblem;
+  /** Nonnegative safe integers in one consistent weight unit. */
+  item_weights?: number[];
+  /** Payload capacity, excluding carton tare weight; null means unlimited. */
+  bin_max_weights?: (number | null)[];
+}
+export type PackingObjective3D = 'bin_count' | 'total_cost';
+export interface ConstrainedOptions3D {
+  objective?: PackingObjective3D;
+  beam_width?: number;
+  max_states?: number;
+}
+export interface ConstrainedSolution3D {
+  solution: ThreeDSolution;
+  bin_indices: number[];
+  demand_indices: number[][];
+  bin_weights: number[];
+  explored_states: number;
+  search_truncated: boolean;
+}
+/** Weight-aware placement with count-first or cost-first construction.
+ * Input weights and output bin weights must be JavaScript safe integers. */
+export function solve3dConstrained(problem: ConstrainedProblem3D, options?: ConstrainedOptions3D | null): ConstrainedSolution3D;
+/** Bounded cost-first search; exact certifies the selected material-cost objective. */
+export function solve1dMinCost(problem: OneDProblem, options?: OneDOptions | null): OneDSolution;
+
+/** Native explicit objectives. Bounds certify only the primary objective. */
+export type PackingObjective = 'bin_count' | 'total_cost' | 'knapsack' | 'feasibility'
+  | 'open_dimension_x' | 'open_dimension_y' | 'open_dimension_z' | 'open_dimension_xy';
+export interface OptimizationProblem<P> {
+  packing: P;
+  /** Finite nonnegative value per source demand; empty defaults to one. */
+  profits?: number[];
+  /** Mandatory source copies under knapsack; empty defaults to zero. */
+  minimum_quantities?: number[];
+}
+export interface OptimizationOptions {
+  objective?: PackingObjective;
+  max_evaluations?: number;
+  packing_max_states?: number;
+  beam_width?: number;
+  /** Nonnegative JavaScript safe integer. */
+  seed?: number;
+}
+export interface OptimizationReport {
+  objective: PackingObjective;
+  complete: boolean;
+  minimums_satisfied: boolean;
+  selected_quantities: number[];
+  total_profit: number;
+  evaluations: number;
+  packing_states: number;
+  search_truncated: boolean;
+  open_extents: number[];
+  primary_value: number;
+  primary_bound: number | null;
+  bound_is_upper: boolean;
+  primary_optimal: boolean;
+}
+export interface OptimizedSolution<S, P> {
+  effective_problem: P;
+  solution: S;
+  stock_indices: number[];
+  demand_indices: number[][];
+  report: OptimizationReport;
+}
+
+export type OptimizationProblem1D = OptimizationProblem<OneDProblem>;
+export type OptimizedSolution1D = OptimizedSolution<OneDSolution, OneDProblem>;
+/** Optimize profit, material, feasibility or open X with source provenance. */
+export function solve1dOptimized(problem: OptimizationProblem1D, options?: OptimizationOptions | null): OptimizedSolution1D;
+
+export type OptimizationProblem2D = OptimizationProblem<ConstrainedProblem2D>;
+export type OptimizedSolution2D = OptimizedSolution<TwoDSolution, ConstrainedProblem2D>;
+export function solve2dOptimized(problem: OptimizationProblem2D, options?: OptimizationOptions | null): OptimizedSolution2D;
+export type StagedAxis2D = 'vertical' | 'horizontal';
+export type FirstStageAxis2D = 'any' | StagedAxis2D;
+export type StagedCutType2D = 'exact' | 'non_exact' | 'homogeneous' | 'roadef2018';
+export interface StagedRules2D {
+  max_stages?: number | null;
+  first_axis?: FirstStageAxis2D;
+  cut_type?: StagedCutType2D;
+  minimum_distance_1_cuts?: number;
+  maximum_distance_1_cuts?: number | null;
+  minimum_distance_2_cuts?: number;
+  maximum_distance_2_cuts?: number | null;
+  maximum_number_1_cuts?: number | null;
+  maximum_number_2_cuts?: number | null;
+  minimum_waste_length?: number;
+  cut_through_defects?: boolean;
+}
+export interface StagedProblem2D {
+  packing: ConstrainedProblem2D;
+  rules?: StagedRules2D;
+  groups?: (number | null)[];
+}
+export interface StagedOptions2D {
+  objective?: PackingObjective2D;
+  beam_width?: number;
+  max_states?: number;
+}
+export interface StagedRegion2D { x: number; y: number; width: number; height: number }
+export type StagedAction2D =
+  | { kind: 'cut'; axis: StagedAxis2D; offset: number; children: number[] }
+  | { kind: 'part'; demand_index: number; rotated: boolean }
+  | { kind: 'waste' };
+export interface StagedNode2D { region: StagedRegion2D; action: StagedAction2D }
+/** Prepared trimmed stock starts at node zero; all finishing cuts remain explicit. */
+export interface StagedTree2D { first_axis: StagedAxis2D; nodes: StagedNode2D[] }
+export interface StagedPart2D { layout_index: number; node_index: number }
+export interface StagedSolution2D {
+  solution: TwoDSolution;
+  stock_indices: number[];
+  demand_indices: number[][];
+  unplaced_quantities: number[];
+  trees: StagedTree2D[];
+  production_order: StagedPart2D[];
+  explored_states: number;
+  search_truncated: boolean;
+}
+export type OptimizationProblemStaged2D = OptimizationProblem<StagedProblem2D>;
+export type OptimizedSolutionStaged2D = OptimizedSolution<StagedSolution2D, StagedProblem2D>;
+/** Construct and independently validate a bounded staged guillotine cut tree. */
+export function solve2dStaged(problem: StagedProblem2D, options?: StagedOptions2D | null): StagedSolution2D;
+export function solve2dStagedOptimized(problem: OptimizationProblemStaged2D, options?: OptimizationOptions | null): OptimizedSolutionStaged2D;
+
+export type OptimizationProblem3D = OptimizationProblem<ConstrainedProblem3D>;
+export type OptimizedSolution3D = OptimizedSolution<ThreeDSolution, ConstrainedProblem3D>;
+export function solve3dOptimized(problem: OptimizationProblem3D, options?: OptimizationOptions | null): OptimizedSolution3D;
+export type FloorAxis3D = 'x' | 'z';
+export type UnloadingConstraint3D = 'none' | 'only_x_movements' | 'only_z_movements' | 'increasing_x' | 'increasing_z';
+/** Every weight and loading limit is a nonnegative JavaScript safe integer. */
+export interface StackItemRules3D {
+  stackability_id?: number;
+  nesting_height?: number;
+  maximum_stackability?: number | null;
+  maximum_weight_above?: number | null;
+  group_id?: number;
+}
+export interface WeightDensity3D { numerator: number; denominator: number }
+export interface FloorDefect3D { x: number; z: number; width: number; depth: number }
+export interface AxleLimits3D {
+  axis: FloorAxis3D;
+  front_position: number;
+  rear_position: number;
+  front_maximum: number;
+  rear_maximum: number;
+  front_tare?: number;
+  rear_tare?: number;
+}
+export interface LoadingBinRules3D {
+  maximum_stack_density?: WeightDensity3D | null;
+  axle_limits?: AxleLimits3D | null;
+  defects?: FloorDefect3D[];
+}
+export interface LoadingProblem3D {
+  packing: ConstrainedProblem3D;
+  item_rules?: StackItemRules3D[];
+  bin_rules?: LoadingBinRules3D[];
+  unloading?: UnloadingConstraint3D;
+}
+export interface LoadingOptions3D {
+  objective?: PackingObjective3D;
+  beam_width?: number;
+  max_states?: number;
+}
+export interface StackedItem3D {
+  demand_index: number;
+  y: number;
+  rotation: 'xyz' | 'xzy' | 'yxz' | 'yzx' | 'zxy' | 'zyx';
+}
+export interface StackColumn3D {
+  x: number;
+  z: number;
+  width: number;
+  depth: number;
+  height: number;
+  weight: number;
+  items: StackedItem3D[];
+}
+export interface AxleLoads3D { front: number; rear: number }
+export interface LoadingBinLayout3D {
+  bin_index: number;
+  payload: number;
+  stacks: StackColumn3D[];
+  axle_loads: AxleLoads3D | null;
+}
+export interface UnplacedLoadingItem3D { demand_index: number; quantity: number }
+export interface LoadingSolution3D {
+  layouts: LoadingBinLayout3D[];
+  unplaced: UnplacedLoadingItem3D[];
+  bin_count: number;
+  total_cost: number;
+  explored_states: number;
+  search_truncated: boolean;
+}
+export type OptimizationProblemLoading3D = OptimizationProblem<LoadingProblem3D>;
+export type OptimizedSolutionLoading3D = OptimizedSolution<LoadingSolution3D, LoadingProblem3D>;
+/** Same-footprint nested stacks, payload, density, axles and unloading rules. */
+export function solve3dLoading(problem: LoadingProblem3D, options?: LoadingOptions3D | null): LoadingSolution3D;
+export function solve3dLoadingOptimized(problem: OptimizationProblemLoading3D, options?: OptimizationOptions | null): OptimizedSolutionLoading3D;
+
+/** Finite coordinates in the original source shape's common local frame. */
+export interface Point2D { x: number; y: number }
+export type CurveSegment2D =
+  | { kind: 'line'; end: Point2D }
+  | { kind: 'arc'; end: Point2D; center: Point2D; clockwise: boolean };
+export type Contour2D =
+  | { kind: 'polygon'; vertices: Point2D[] }
+  | { kind: 'circle'; center: Point2D; radius: number }
+  | { kind: 'curve'; start: Point2D; segments: CurveSegment2D[] };
+export interface Polygon2D { exterior: Contour2D; holes?: Contour2D[] }
+export interface Shape2D { components: Polygon2D[] }
+export interface RotationRange2D { start: number; end: number }
+export interface IrregularBin {
+  name: string;
+  shape: Shape2D;
+  cost?: number;
+  quantity?: number | null;
+  defects?: Shape2D[];
+  spacing?: number;
+}
+export interface IrregularDemand {
+  name: string;
+  shape: Shape2D;
+  quantity: number;
+  allowed_rotations?: RotationRange2D[];
+  can_mirror?: boolean;
+  profit?: number;
+}
+export interface IrregularProblem { bins: IrregularBin[]; demands: IrregularDemand[] }
+export type IrregularObjective = 'bin_count' | 'total_cost' | 'knapsack' | 'feasibility'
+  | 'open_dimension_x' | 'open_dimension_y' | 'open_dimension_xy';
+export interface IrregularOptions {
+  objective?: IrregularObjective;
+  max_states?: number;
+  beam_width?: number;
+  max_candidates_per_item?: number;
+  rotation_step_degrees?: number;
+  max_orientations?: number;
+  curve_tolerance?: number;
+  item_spacing?: number;
+  bin_spacing?: number;
+  defect_spacing?: number;
+}
+export interface IrregularPlacement {
+  demand_index: number;
+  x: number;
+  y: number;
+  rotation_degrees: number;
+  mirrored: boolean;
+}
+export interface IrregularLayout {
+  bin_index: number;
+  placements: IrregularPlacement[];
+  used_area: number;
+  used_width: number;
+  used_height: number;
+}
+/** Returned controls are fully populated even when options were omitted. */
+export interface IrregularSolution {
+  algorithm: string;
+  options: Required<IrregularOptions>;
+  layouts: IrregularLayout[];
+  unplaced_quantities: number[];
+  total_cost: number;
+  total_profit: number;
+  feasible: boolean;
+  explored_states: number;
+  construction_probes: number;
+  search_truncated: boolean;
+}
+export function solveIrregular(problem: IrregularProblem, options?: IrregularOptions | null): IrregularSolution;
+
+export function solveIrregularJson(problem_json: string, options_json?: string | null): string;

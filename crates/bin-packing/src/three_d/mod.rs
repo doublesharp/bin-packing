@@ -11,15 +11,18 @@ mod auto;
 mod bounds;
 mod column;
 mod common;
+pub mod constrained;
 mod dblf;
 mod exact;
 mod extreme_points;
 mod grasp;
 mod guillotine;
 mod layer;
+pub mod loading;
 mod local_search;
 mod model;
 mod multi_start;
+pub mod optimization;
 mod sorted;
 mod wall;
 

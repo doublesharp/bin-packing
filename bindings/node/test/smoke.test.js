@@ -3,6 +3,10 @@ const assert = require('node:assert/strict');
 
 const binPacking = require('..');
 
+test('constrained and adaptive APIs preserve the native package contract', () => {
+  require('../../test/package-contract.cjs').packageContract(binPacking);
+});
+
 test('version returns a non-empty string', () => {
   assert.ok(typeof binPacking.version() === 'string');
   assert.ok(binPacking.version().length > 0);

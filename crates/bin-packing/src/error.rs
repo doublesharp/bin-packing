@@ -7,6 +7,20 @@ pub enum BinPackingError {
     /// The problem failed input validation (e.g. empty demand list, zero dimension, invalid cost).
     #[error("invalid input: {0}")]
     InvalidInput(String),
+    /// A constrained solver received a malformed constraint or search control.
+    #[error("invalid constraint `{field}`: {reason}")]
+    InvalidConstraint {
+        /// Constraint or option field that failed validation.
+        field: String,
+        /// Description of the violated requirement.
+        reason: String,
+    },
+    /// An independently checked constrained solution violated its input contract.
+    #[error("invalid packing solution: {reason}")]
+    InvalidSolution {
+        /// Geometry, provenance, accounting, or capacity requirement that failed.
+        reason: String,
+    },
     /// The requested solver configuration is not currently supported.
     #[error("unsupported configuration: {0}")]
     Unsupported(String),

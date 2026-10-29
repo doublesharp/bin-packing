@@ -19,10 +19,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(here, '..');
 
 const variants = [
+  { name: 'irregular', distPrefix: 'dist/irregular', features: ['irregular'], types: 'types/irregular.d.ts', webInit: 'types/web-init-irregular.d.ts' },
   {
     name: 'full',
     distPrefix: 'dist',
-    features: ['one-d', 'two-d', 'three-d', 'json'],
+    features: ['one-d', 'two-d', 'three-d', 'irregular', 'json'],
     types: 'types/bin_packing_wasm.d.ts',
   },
   {
@@ -175,7 +176,7 @@ async function main() {
     }
   }
 
-  console.log('\nAll targets built. Output in dist/{bundler,web,nodejs} and dist/{one-d,two-d,three-d}/{bundler,web,nodejs}/.');
+  console.log('\nAll targets built. Output in dist/{bundler,web,nodejs} and dist/{one-d,two-d,three-d,irregular}/{bundler,web,nodejs}/.');
 }
 
 main().catch((error) => {

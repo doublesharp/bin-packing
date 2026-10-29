@@ -6,7 +6,7 @@
 
 Native Node.js bindings for the [`bin-packing`](https://crates.io/crates/bin-packing)
 Rust crate — a cut list and bin packing optimizer for 1D cutting stock (linear
-bar / pipe), 2D rectangular sheet packing, and 3D box packing.
+bar / pipe), 2D rectangular sheet packing, 3D box packing, staged cutting, stack loading and native irregular nesting.
 
 Prebuilt binaries for Linux (x64, arm64), macOS (x64, arm64), and Windows
 (x64, arm64). No Rust toolchain required.
@@ -18,6 +18,41 @@ pnpm add @0xdoublesharp/bin-packing
 ```
 
 ## Usage
+
+The explicit-objective APIs are `solve1dOptimized`, `solve2dOptimized` and
+`solve3dOptimized`. Requests contain `{ packing, profits?, minimum_quantities? }`;
+options select `bin_count`, `total_cost`, `knapsack`, `feasibility` or supported
+`open_dimension_*` objectives. Results retain the effective source problem,
+indexed stock/demand provenance, native solution and an objective report.
+Unplaced copies and bounded-search failures are not infeasibility proofs.
+
+`solve2dStaged` returns physical staged guillotine cut trees, including kerf,
+trims, defects, machine distances/counts and cutting groups.
+`solve2dStagedOptimized` applies explicit objectives to that model.
+`solve3dLoading` handles compatible nested stacks, payloads, stack limits,
+density, axle reactions and unloading rules; `solve3dLoadingOptimized` adds
+explicit objectives. `solveIrregular` nests rigid polygons, holes, circles and
+arcs with permitted rotations/reflection and spacing. Original source indices
+remain authoritative when labels repeat.
+
+Every numeric input must be finite. Weights, density fractions, axle limits,
+stack load limits and seeds must be nonnegative JavaScript safe integers.
+Optional limits may be omitted or explicitly `null` where declared nullable;
+non-finite values and undefined array elements are rejected before JSON
+serialization. Unsafe aggregate output loads are rejected. Large area/volume
+summary metrics continue to use ordinary JSON-number precision.
+
+
+The additional APIs are `solve1dMinCost`, `solve2dConstrained`,
+`solve3dConstrained`, `solve2dAdaptive` and `lowerBound2d`. Dimension-specific
+WASM builds expose the corresponding dimension's APIs. Constrained requests
+wrap an ordinary problem in `{ problem, ...constraints }`: 2D adds indexed
+sheet trims and rectangular defects; 3D adds item weights and maximum payloads.
+Weights must be nonnegative JavaScript safe integers; only explicit `null`
+means an unlimited payload. Cost-first objectives prioritize demand fulfillment.
+Budgets count algorithm calls or successor states, rather than wall time;
+adaptive count certificates cover sheet count only. Existing solvers keep their
+ranking.
 
 ```js
 const { solve1d, solve2d, solve3d } = require('@0xdoublesharp/bin-packing');

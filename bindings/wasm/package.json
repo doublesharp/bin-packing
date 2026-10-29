@@ -88,7 +88,23 @@
       "import": "./dist/three-d/nodejs/bin_packing_wasm.cjs",
       "default": "./dist/three-d/nodejs/bin_packing_wasm.cjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./irregular": {
+      "types": "./dist/irregular/bundler/bin_packing_wasm.d.ts",
+      "import": "./dist/irregular/bundler/bin_packing_wasm.js",
+      "default": "./dist/irregular/bundler/bin_packing_wasm.js"
+    },
+    "./irregular/web": {
+      "types": "./dist/irregular/web/bin_packing_wasm.d.ts",
+      "import": "./dist/irregular/web/bin_packing_wasm.js",
+      "default": "./dist/irregular/web/bin_packing_wasm.js"
+    },
+    "./irregular/nodejs": {
+      "types": "./dist/irregular/nodejs/bin_packing_wasm.d.cts",
+      "require": "./dist/irregular/nodejs/bin_packing_wasm.cjs",
+      "import": "./dist/irregular/nodejs/bin_packing_wasm.cjs",
+      "default": "./dist/irregular/nodejs/bin_packing_wasm.cjs"
+    }
   },
   "publishConfig": {
     "access": "public"

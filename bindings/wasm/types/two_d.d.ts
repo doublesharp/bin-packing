@@ -289,3 +289,149 @@ export interface SawPlan2D {
 }
 /** Plan a physical saw job. Execute operations in order; sheet views are diagram references. */
 export function plan2dSawCuts(job: SawJob2D, options?: SawPlanOptions2D | null): SawPlan2D;
+
+/** Integer constraints in the sheet's original coordinate frame. */
+export interface Defect2D {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface SheetConstraints2D {
+  trim_left?: number;
+  trim_right?: number;
+  trim_top?: number;
+  trim_bottom?: number;
+  defects?: Defect2D[];
+}
+export interface ConstrainedProblem2D {
+  problem: TwoDProblem;
+  constraints?: SheetConstraints2D[];
+}
+export type PackingObjective2D = 'bin_count' | 'total_cost';
+export interface ConstrainedOptions2D {
+  objective?: PackingObjective2D;
+  beam_width?: number;
+  max_states?: number;
+}
+export interface ConstrainedSolution2D {
+  solution: TwoDSolution;
+  stock_indices: number[];
+  demand_indices: number[][];
+  explored_states: number;
+  search_truncated: boolean;
+}
+/** Trims/defects, finite inventory and count-first or cost-first construction. */
+export function solve2dConstrained(problem: ConstrainedProblem2D, options?: ConstrainedOptions2D | null): ConstrainedSolution2D;
+export interface AdaptiveOptions2D {
+  solver?: TwoDOptions;
+  max_candidates?: number;
+  stop_on_count_bound?: boolean;
+}
+export interface AdaptiveSolution2D {
+  solution: TwoDSolution;
+  lower_bound: number;
+  count_optimal: boolean;
+  candidates_run: number;
+  stopped_on_bound: boolean;
+  candidate_limit_reached: boolean;
+}
+/** A count certificate does not certify offcuts or other secondary metrics. */
+export function solve2dAdaptive(problem: TwoDProblem, options?: AdaptiveOptions2D | null): AdaptiveSolution2D;
+/** Conservative sheet-count bound, relaxing inventory and blade gaps. */
+export function lowerBound2d(problem: TwoDProblem): number;
+
+/** Native explicit objectives. Bounds certify only the primary objective. */
+export type PackingObjective = 'bin_count' | 'total_cost' | 'knapsack' | 'feasibility'
+  | 'open_dimension_x' | 'open_dimension_y' | 'open_dimension_z' | 'open_dimension_xy';
+export interface OptimizationProblem<P> {
+  packing: P;
+  /** Finite nonnegative value per source demand; empty defaults to one. */
+  profits?: number[];
+  /** Mandatory source copies under knapsack; empty defaults to zero. */
+  minimum_quantities?: number[];
+}
+export interface OptimizationOptions {
+  objective?: PackingObjective;
+  max_evaluations?: number;
+  packing_max_states?: number;
+  beam_width?: number;
+  /** Nonnegative JavaScript safe integer. */
+  seed?: number;
+}
+export interface OptimizationReport {
+  objective: PackingObjective;
+  complete: boolean;
+  minimums_satisfied: boolean;
+  selected_quantities: number[];
+  total_profit: number;
+  evaluations: number;
+  packing_states: number;
+  search_truncated: boolean;
+  open_extents: number[];
+  primary_value: number;
+  primary_bound: number | null;
+  bound_is_upper: boolean;
+  primary_optimal: boolean;
+}
+export interface OptimizedSolution<S, P> {
+  effective_problem: P;
+  solution: S;
+  stock_indices: number[];
+  demand_indices: number[][];
+  report: OptimizationReport;
+}
+
+export type OptimizationProblem2D = OptimizationProblem<ConstrainedProblem2D>;
+export type OptimizedSolution2D = OptimizedSolution<TwoDSolution, ConstrainedProblem2D>;
+export function solve2dOptimized(problem: OptimizationProblem2D, options?: OptimizationOptions | null): OptimizedSolution2D;
+export type StagedAxis2D = 'vertical' | 'horizontal';
+export type FirstStageAxis2D = 'any' | StagedAxis2D;
+export type StagedCutType2D = 'exact' | 'non_exact' | 'homogeneous' | 'roadef2018';
+export interface StagedRules2D {
+  max_stages?: number | null;
+  first_axis?: FirstStageAxis2D;
+  cut_type?: StagedCutType2D;
+  minimum_distance_1_cuts?: number;
+  maximum_distance_1_cuts?: number | null;
+  minimum_distance_2_cuts?: number;
+  maximum_distance_2_cuts?: number | null;
+  maximum_number_1_cuts?: number | null;
+  maximum_number_2_cuts?: number | null;
+  minimum_waste_length?: number;
+  cut_through_defects?: boolean;
+}
+export interface StagedProblem2D {
+  packing: ConstrainedProblem2D;
+  rules?: StagedRules2D;
+  groups?: (number | null)[];
+}
+export interface StagedOptions2D {
+  objective?: PackingObjective2D;
+  beam_width?: number;
+  max_states?: number;
+}
+export interface StagedRegion2D { x: number; y: number; width: number; height: number }
+export type StagedAction2D =
+  | { kind: 'cut'; axis: StagedAxis2D; offset: number; children: number[] }
+  | { kind: 'part'; demand_index: number; rotated: boolean }
+  | { kind: 'waste' };
+export interface StagedNode2D { region: StagedRegion2D; action: StagedAction2D }
+/** Prepared trimmed stock starts at node zero; all finishing cuts remain explicit. */
+export interface StagedTree2D { first_axis: StagedAxis2D; nodes: StagedNode2D[] }
+export interface StagedPart2D { layout_index: number; node_index: number }
+export interface StagedSolution2D {
+  solution: TwoDSolution;
+  stock_indices: number[];
+  demand_indices: number[][];
+  unplaced_quantities: number[];
+  trees: StagedTree2D[];
+  production_order: StagedPart2D[];
+  explored_states: number;
+  search_truncated: boolean;
+}
+export type OptimizationProblemStaged2D = OptimizationProblem<StagedProblem2D>;
+export type OptimizedSolutionStaged2D = OptimizedSolution<StagedSolution2D, StagedProblem2D>;
+/** Construct and independently validate a bounded staged guillotine cut tree. */
+export function solve2dStaged(problem: StagedProblem2D, options?: StagedOptions2D | null): StagedSolution2D;
+export function solve2dStagedOptimized(problem: OptimizationProblemStaged2D, options?: OptimizationOptions | null): OptimizedSolutionStaged2D;

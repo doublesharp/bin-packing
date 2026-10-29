@@ -3,25 +3,31 @@
 //! Provides MaxRects (several heuristics), Skyline, Guillotine beam search, and shelf-based
 //! NFDH/FFDH/BFDH algorithms plus a multistart meta-strategy.
 
+pub mod adaptive;
 mod bounded_search;
+mod bounds;
+pub mod constrained;
 pub mod cut_plan;
 mod drops;
 mod guillotine;
 mod kerf;
 mod maxrects;
 mod model;
+pub mod optimization;
 mod pattern_pool;
 pub mod reuse;
 mod rotation_search;
 pub mod saw_plan;
 mod shelf;
 mod skyline;
+pub mod staged;
 
 pub use model::{
     Placement2D, RectDemand2D, Sheet2D, SheetLayout2D, SolverMetrics2D, TwoDAlgorithm, TwoDOptions,
     TwoDProblem, TwoDSolution,
 };
 
+pub use bounds::lower_bound_2d;
 pub use pattern_pool::solve_2d_recombined;
 
 use crate::Result;
@@ -824,5 +830,39 @@ mod tests {
                 .expect("place");
         assert!(placements.is_empty());
         assert_eq!(leftover.len(), 1);
+        let options = TwoDOptions::default();
+        let (placements, leftover) =
+            place_into_sheet(&[], 3, 5, TwoDAlgorithm::MaxRects, &options).expect("empty input");
+        assert!(placements.is_empty() && leftover.is_empty());
+        for (width, height, can_rotate, expected) in
+            [(5, 3, true, true), (5, 3, false, false), (2, 6, true, false), (6, 2, true, false)]
+        {
+            let item = ItemInstance2D {
+                fixed_rotation: None,
+                name: "original identity".into(),
+                width,
+                height,
+                can_rotate,
+            };
+            let (placements, leftover) = place_into_sheet(
+                std::slice::from_ref(&item),
+                3,
+                5,
+                TwoDAlgorithm::MaxRects,
+                &options,
+            )
+            .expect("partial placement preserves infeasible items");
+            assert_eq!(placements.len(), usize::from(expected));
+            assert_eq!(leftover.len(), usize::from(!expected));
+            if expected {
+                assert_eq!(placements[0].name, item.name);
+                assert_eq!((placements[0].width, placements[0].height), (3, 5));
+                assert!(placements[0].rotated);
+            } else {
+                assert_eq!((leftover[0].width, leftover[0].height), (width, height));
+                assert_eq!(leftover[0].name, item.name);
+                assert_eq!(leftover[0].can_rotate, can_rotate);
+            }
+        }
     }
 }

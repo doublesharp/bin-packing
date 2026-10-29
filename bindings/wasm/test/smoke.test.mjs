@@ -13,6 +13,17 @@ const wasmOneD = require('../dist/one-d/nodejs/bin_packing_wasm.cjs');
 const wasmTwoD = require('../dist/two-d/nodejs/bin_packing_wasm.cjs');
 const wasmThreeD = require('../dist/three-d/nodejs/bin_packing_wasm.cjs');
 
+test('constrained and adaptive APIs work in combined and dimension-specific WASM', () => {
+  const {packageContract} = require('../../test/package-contract.cjs');
+  packageContract(wasm);
+  packageContract(wasmTwoD,[2]);
+  packageContract(wasmThreeD,[3]);
+  assert.equal(typeof wasmOneD.solve2dConstrained,'undefined');
+  assert.equal(typeof wasmOneD.solve3dConstrained,'undefined');
+  assert.equal(typeof wasmTwoD.solve3dConstrained,'undefined');
+  assert.equal(typeof wasmThreeD.solve2dConstrained,'undefined');
+});
+
 test('solve1d returns a feasible cut list', () => {
   const solution = wasm.solve1d(
     {

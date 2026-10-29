@@ -6,8 +6,9 @@
 
 A Rust-first cut list and bin packing optimization library for one-dimensional
 cutting stock (linear bar / pipe stock), two-dimensional rectangular sheet
-stock, and three-dimensional box-into-bin packing problems. The crate is
-`#![forbid(unsafe_code)]`, integer-math oriented, and `serde`-friendly so
+stock, three-dimensional box packing, and irregular nesting problems. The crate
+uses `#![forbid(unsafe_code)]`, widened integer dimensions for regular packing,
+and explicit floating-point tolerances for irregular geometry. It is `serde`-friendly so
 problems and solutions travel cleanly across process boundaries and language
 bindings.
 
@@ -24,6 +25,23 @@ bindings.
   entry points.
 
 ## Features
+
+### Native geometry, physical rules and explicit objectives
+
+- [Irregular nesting](docs/irregular.md): concave polygons, holes, circular arcs,
+  rigid components, irregular bins/defects, rotations, reflection and spacing.
+- [Staged cutting](docs/two-d/staged.md): physical cut trees, stage limits,
+  cut modes, cut spacing/counts, defects, trims, kerf and production groups.
+- [Stack loading](docs/three-d/loading.md): compatible upright columns, nesting,
+  stack/weight/density limits, payload, exact axle reactions and unloading groups.
+- [Explicit objectives](docs/objectives.md): material cost, profit/knapsack,
+  feasibility and open dimensions across regular and physical models.
+
+These APIs are native Rust and available through Node.js and WebAssembly. The
+optional `irregular` feature uses safe Rust geometry. PackingSolver supplies
+reference algorithms and benchmark workloads; no C++ backend is required.
+Each model documents its supported bounds, geometric approximation and search
+limits. Independent validators check source identity and physical results.
 
 ### 1D cutting stock
 
@@ -197,6 +215,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 ### Cross-cutting
+
+- **Cost-first linear stock.** `one_d::solve_1d_min_cost` (JavaScript
+  `solve1dMinCost`) can use more bars when doing so reduces material cost. It
+  retains the existing bounded pattern search, inventory and kerf/trim behavior.
+  See [cost-first cutting stock](docs/one-d/min-cost.md).
+- **Native constrained packing.** Additive `two_d::constrained` and
+  `three_d::constrained` APIs support physical sheet trims/rectangular defects,
+  carton payload limits, explicit source indices, independent validation, and
+  count-first or cost-first construction. JavaScript exposes
+  `solve2dConstrained` and `solve3dConstrained` in Node and dimension-specific
+  WebAssembly builds. See [2D constraints](docs/two-d/constrained.md) and
+  [3D constraints](docs/three-d/constrained.md) for limits and semantics.
+- **Count-bound-aware search.** `two_d::adaptive::solve_2d_adaptive` (JavaScript
+  `solve2dAdaptive`) can stop once a complete packing meets a conservative
+  geometric lower bound. It certifies sheet count only; ordinary Auto and its
+  secondary ranking remain unchanged. See [adaptive search](docs/two-d/adaptive.md).
 
 - **`serde` round-tripping.** Every request, option, solution, and metrics
   type derives `Serialize` / `Deserialize`.
@@ -867,11 +901,14 @@ Full Rust/doc/text/TOML quality gate (matches CI):
 ./scripts/check-quality.sh
 ```
 
+See [correctness checks and production coverage](docs/testing-confidence.md) for
+independent oracle tests and the repeatable line/branch coverage command.
+
 Equivalent individual commands:
 
 ```sh
 cargo fmt --all --check
-taplo fmt --check .
+taplo fmt --check
 typos
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --all-features --locked

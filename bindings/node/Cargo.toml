@@ -14,10 +14,11 @@ serde_json.workspace = true
 bin-packing = { path = "../../crates/bin-packing", default-features = false }
 
 [features]
-default = ["one-d", "two-d", "three-d", "parallel"]
+default = ["one-d", "two-d", "three-d", "irregular", "parallel"]
 one-d = ["bin-packing/one-d"]
 two-d = ["bin-packing/two-d"]
 three-d = ["bin-packing/three-d"]
+irregular = ["bin-packing/irregular"]
 three-d-preview = ["three-d"]
 parallel = ["bin-packing/parallel"]
 

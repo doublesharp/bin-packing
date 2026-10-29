@@ -27,10 +27,11 @@ serde-wasm-bindgen.workspace = true
 wasm-bindgen.workspace = true
 
 [features]
-default = ["one-d", "two-d", "three-d", "json"]
+default = ["one-d", "two-d", "three-d", "irregular", "json"]
 one-d = ["bin-packing/one-d"]
 two-d = ["bin-packing/two-d"]
 three-d = ["bin-packing/three-d"]
+irregular = ["bin-packing/irregular"]
 three-d-preview = ["three-d"]
 # Marker feature gating the JSON-string `solve*Json` helpers. serde_json itself
 # is always a dependency (see note above).
