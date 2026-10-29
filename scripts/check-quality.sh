@@ -36,7 +36,7 @@ require_cmd node
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests
 cargo fmt --all --check
-taplo fmt --check .
+taplo fmt --check
 typos
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --all-features --locked

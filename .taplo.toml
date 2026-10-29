@@ -1,5 +1,14 @@
 include = ["**/*.toml"]
-exclude = ["Cargo.lock", "fuzz/Cargo.lock", "target/**", "fuzz/target/**", "**/node_modules/**", "bindings/wasm/dist/**", "bindings/node/npm/**"]
+exclude = [
+  ".cargo/**",
+  "Cargo.lock",
+  "fuzz/Cargo.lock",
+  "target/**",
+  "fuzz/target/**",
+  "**/node_modules/**",
+  "bindings/wasm/dist/**",
+  "bindings/node/npm/**",
+]
 
 [formatting]
 align_entries = false
