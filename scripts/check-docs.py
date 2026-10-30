@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 BEGIN = '<!-- BEGIN GENERATED: dependency -->'
@@ -106,6 +106,26 @@ def wasm_import_table(wasm):
     return '\n'.join(lines)
 
 
+def pin_release_links(root, page, text, version, repository):
+    """Release bodies lack the Markdown source path, so pin relative links first."""
+    def replace(match):
+        label, raw = match.groups()
+        target = urlsplit(raw)
+        if target.scheme or target.netloc or not target.path:
+            return match[0]
+        destination = (page.parent / unquote(target.path)).resolve()
+        if target.path.startswith('/') or not destination.is_relative_to(root.resolve()):
+            raise ValueError(f'Release documentation link escapes the repository: {raw}')
+        relative = quote(destination.relative_to(root.resolve()).as_posix(), safe='/')
+        url = f'{repository.rstrip("/")}/blob/v{version}/{relative}'
+        if target.query:
+            url += '?' + target.query
+        if target.fragment:
+            url += '#' + target.fragment
+        return f'[{label}]({url})'
+    return re.sub(r'(?<!!)\[([^]\n]+)\]\(([^)\s]+)\)', replace, text)
+
+
 def render_reference(root, defaults):
     workspace = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']
     core = tomllib.loads((root / 'crates/bin-packing/Cargo.toml').read_text())
@@ -166,7 +186,8 @@ def render_reference(root, defaults):
 
 
 def generated_files(root, defaults):
-    version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
+    metadata = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']
+    version = metadata['version']
     readme = update_dependency((root / 'README.md').read_text(), version)
     readme = re.sub(r'\[v\d+\.\d+\.\d+ release notes\]\(docs/releases/v\d+\.\d+\.\d+\.md\)',
                     f'[v{version} release notes](docs/releases/v{version}.md)', readme)
@@ -174,6 +195,8 @@ def generated_files(root, defaults):
                    f'[v{version}](releases/v{version}.md)', (root / 'docs/README.md').read_text())
     files = {root / 'docs/reference.md': render_reference(root, defaults),
              root / 'README.md': readme, root / 'docs/README.md': index}
+    notes = root / f'docs/releases/v{version}.md'
+    files[notes] = pin_release_links(root, notes, notes.read_text(), version, metadata['repository'])
     for name in ['node', 'wasm']:
         page = root / f'bindings/{name}/README.md'
         files[page] = re.sub(r'https://github.com/doublesharp/bin-packing/blob/(?:main|v\d+\.\d+\.\d+)/',

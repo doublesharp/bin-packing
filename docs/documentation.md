@@ -10,7 +10,9 @@ python3 -B scripts/check-docs.py --write
 
 `--write` updates the [generated reference](reference.md), the README dependency
 version, current release-note links and version-pinned GitHub documentation links
-in both npm READMEs, plus the WASM import table. It reads Cargo/npm metadata and
+in both npm READMEs, plus the WASM import table. Relative links in the current
+release notes are pinned to the same version so they also work in the GitHub
+release body, where the source file's directory is unavailable. It reads Cargo/npm metadata and
 TypeScript declarations, and runs `doc_reference` to serialize actual Rust
 defaults. It never updates sources in the disposable Scratch mirror. The normal
 quality gate regenerates in memory and fails on any difference; CI uses the same

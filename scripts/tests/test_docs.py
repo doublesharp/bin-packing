@@ -12,6 +12,22 @@ SPEC.loader.exec_module(DOCS)
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_release_body_links_use_source_location_and_the_selected_version(self):
+        root = Path('/example/repo')
+        page = root / 'docs/releases/v0.6.0.md'
+        text = '[guide](../guide.md#rules) [home](../../README.md) [web](https://example.com) [local](#section)'
+        result = DOCS.pin_release_links(root, page, text, '0.6.0', 'https://github.com/example/repo')
+        self.assertIn('[guide](https://github.com/example/repo/blob/v0.6.0/docs/guide.md#rules)', result)
+        self.assertIn('[home](https://github.com/example/repo/blob/v0.6.0/README.md)', result)
+        self.assertIn('[web](https://example.com) [local](#section)', result)
+        self.assertEqual(DOCS.pin_release_links(root, page, result, '0.6.0', 'https://github.com/example/repo'), result)
+
+    def test_release_links_cannot_escape_into_machine_local_files(self):
+        root = Path('/example/repo')
+        with self.assertRaises(ValueError):
+            DOCS.pin_release_links(root, root / 'docs/releases/v0.6.0.md',
+                                   '[private](../../../private.md)', '0.6.0', 'https://github.com/example/repo')
+
     def test_machine_local_absolute_links_are_rejected_even_when_the_file_exists(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
