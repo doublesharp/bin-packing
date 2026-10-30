@@ -17,6 +17,7 @@ This page records source configuration, not runtime or platform qualification.
 | CI Node version | `22` |
 | CI TypeScript | `5.9.3` |
 | CI Playwright | `1.56.1` |
+| CI browser runner | `ubuntu-24.04` |
 
 ## Cargo features
 

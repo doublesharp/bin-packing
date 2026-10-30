@@ -87,7 +87,7 @@ class DocumentationTests(unittest.TestCase):
             files = {
                 'Cargo.toml': '[workspace.package]\nversion="0.6.0"\nrust-version="1.99"\n',
                 'rust-toolchain.toml': '[toolchain]\nchannel="1.99.0"\n',
-                '.github/workflows/ci.yml': 'env:\n  DOCS_TYPESCRIPT_VERSION: "5.9.3"\n  DOCS_PLAYWRIGHT_VERSION: "1.56.1"\n  NODE_VERSION: "22"\n',
+                '.github/workflows/ci.yml': 'env:\n  DOCS_TYPESCRIPT_VERSION: "5.9.3"\n  DOCS_PLAYWRIGHT_VERSION: "1.56.1"\n  NODE_VERSION: "22"\njobs:\n  wasm:\n    runs-on: ubuntu-24.04\n',
                 'crates/bin-packing/Cargo.toml': '[features]\ndefault=["one-d"]\none-d=[]\n',
                 'bindings/node/package.json': json.dumps({'engines': {'node': '>=18'}, 'napi': {'targets': ['aarch64-apple-darwin']}}),
                 'bindings/wasm/package.json': json.dumps({'name': '@example/packing', 'engines': {'node': '>=18'}, 'exports': {'.': {'types': './index.d.ts'}}}),
@@ -101,6 +101,7 @@ class DocumentationTests(unittest.TestCase):
                 path.write_text(text)
             before = DOCS.render_reference(root, {'Options': {'beam_width': 8}})
             (root / 'Cargo.toml').write_text(files['Cargo.toml'].replace('0.6.0', '0.7.0'))
+            (root / '.github/workflows/ci.yml').write_text(files['.github/workflows/ci.yml'].replace('ubuntu-24.04', 'ubuntu-22.04'))
             with (root / 'bindings/wasm/types/irregular.d.ts').open('a') as output:
                 output.write('export function nest(): unknown;\n')
             after = DOCS.render_reference(root, {'Options': {'beam_width': 16}})
@@ -108,6 +109,7 @@ class DocumentationTests(unittest.TestCase):
             self.assertIn('`0.7.0`', after)
             self.assertIn('| `nest` | — | — | — | — | — | Yes |', after)
             self.assertIn('"beam_width": 16', after)
+            self.assertIn('| CI browser runner | `ubuntu-22.04` |', after)
 
 
 if __name__ == '__main__':
