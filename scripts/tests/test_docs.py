@@ -12,6 +12,18 @@ SPEC.loader.exec_module(DOCS)
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_machine_local_absolute_links_are_rejected_even_when_the_file_exists(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / 'repo'
+            root.mkdir()
+            evidence = base / 'receipt.json'
+            evidence.write_text('{}')
+            (root / 'README.md').write_text(f'[receipt]({evidence})\n')
+            errors = DOCS.local_link_errors(root)
+            self.assertEqual(len(errors), 1, 'host-local evidence must not make the check machine-dependent')
+            self.assertIn('absolute', errors[0])
+
     def test_rust_example_project_has_sources_before_cargo_resolves_the_lock(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

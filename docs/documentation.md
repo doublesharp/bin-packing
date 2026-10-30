@@ -38,6 +38,9 @@ to the file list in `bindings/test/docs-examples.cjs` when introducing another
 guide. GitHub links to this repository's `main` or the current version tag are
 mapped to local source files and anchors, including npm-facing documentation.
 Other external links are reviewed separately; the check does not fetch the internet.
+Machine-local absolute links are rejected even if they exist on the current host.
+Record external evidence paths as inline code so verification does not depend on
+one machine's retained artifacts.
 
 Model bounds, source-model field defaults, seed fallback constants and algorithm
 explanations require a source review; they cannot be

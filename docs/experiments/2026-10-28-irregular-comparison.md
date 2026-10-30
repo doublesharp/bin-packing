@@ -118,7 +118,8 @@ conditions do not support a general speed claim or a claim about time to equal
 quality.
 
 Raw inputs, commands, outputs, certificates, logs, samples, and full hashes are
-in the untracked [local Scratch report](/Volumes/Scratch/bin-packing/reports/irregular-completion-20261028/final.json)
+in the untracked local Scratch report at
+`/Volumes/Scratch/bin-packing/reports/irregular-completion-20261028/final.json`
 and its adjacent `final-artifacts` directory. The combined source SHA-256 is
 `15ecf0b2809b4aaa15a5d15f316707f5835a4f9d9efca36e97ff24d49f06b70c`;
 the report SHA-256 is

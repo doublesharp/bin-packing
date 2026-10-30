@@ -57,6 +57,9 @@ def local_link_errors(root):
                 destination = page.parent / unquote(target.path) if target.path else page
             if target.scheme or target.netloc:
                 continue
+            if target.path.startswith('/'):
+                errors.append(f'{page.relative_to(root)}: nonportable absolute local link {raw}; use a code path for external evidence')
+                continue
             if not destination.exists():
                 errors.append(f'{page.relative_to(root)}: missing {raw}')
             elif target.fragment and destination.suffix == '.md':
