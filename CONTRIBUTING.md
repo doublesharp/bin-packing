@@ -54,7 +54,7 @@ routing. Edit sources and lockfiles only in the original checkout.
 - Document public items and non-obvious algorithmic complexity. Put shared
   helpers in the relevant model module rather than copying them between
   algorithms.
-- Keep the 1D, 2D, and 3D APIs consistent. For public model or serialization
+- Keep the 1D, 2D, 3D and irregular APIs consistent. For public model or serialization
   changes, check both language bindings, their declarations, examples, and docs.
 - For randomized behavior, include the problem, options, and seed in regression
   cases. For performance changes, record the workload and measurement method;
@@ -75,8 +75,9 @@ Before submitting a pull request, run the required local gate:
 ```
 
 It runs the runner tests, Rust formatting, TOML formatting, spelling checks,
-workspace Clippy with warnings denied, workspace tests, and Rust documentation
-generation. With Scratch configured, the script uses the saved build workspace
+workspace Clippy with warnings denied, workspace tests, crate doctests and Rust documentation
+generation, generated-document comparison, local-link checks and runnable Rust
+examples. With Scratch configured, the script uses the saved build workspace
 automatically.
 
 Run additional checks for the affected boundary:
@@ -92,6 +93,15 @@ feature coverage, package checks, and browser checks. Use
 `python3 scripts/scratch.py run <command>` for other disposable work. Report
 checks you could not run and why; a Rust check alone does not verify a native
 package or browser entry point.
+
+## Updating documentation and releases
+
+Refresh source-derived versions, exports, features and defaults with
+`python3 -B scripts/check-docs.py --write`. Keep model bounds and proof descriptions
+consistent with their owning code; update complete runnable examples when APIs
+change. The [maintenance guide](docs/documentation.md) maps changing facts to
+sources and publication checks. Follow the [release runbook](docs/releasing.md)
+for publishing; historical measurements retain their original dates and scope.
 
 ## Reporting bugs and proposing features
 

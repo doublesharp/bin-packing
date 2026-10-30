@@ -8,13 +8,16 @@ WebAssembly build of the [`bin-packing`](https://crates.io/crates/bin-packing)
 Rust crate — a cut list and bin packing optimizer for 1D cutting stock (linear
 bar / pipe), 2D rectangular sheet packing, 3D box packing, staged cutting, stack loading and native irregular nesting.
 
-Runs in **browsers, Node.js 18+, Deno, Bun, and Cloudflare Workers**. No
-native binaries, no build step, no `node-gyp`.
+Provides browser and Node.js targets without native binaries or `node-gyp`.
+See the [generated engine and export reference](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/reference.md)
+for the Node engine range. Deno, Bun and worker-host integrations may require
+loader configuration and are not covered by the Node/Chromium qualification.
 
 ## Features
 
 - **1D cutting stock.** First-fit-decreasing, best-fit-decreasing, multistart
-  local search, and an exact column-generation backend.
+  local search, and a restricted column-generation backend that proves count
+  optimality only after complete pattern enumeration and integer search.
 - **2D rectangular packing.** MaxRects (best-area, BSSF, BLSF, bottom-left,
   contact-point), Skyline (+ min-waste), Guillotine beam search (7 variants),
   shelf heuristics (NFDH, FFDH, BFDH), multistart, and rotation search
@@ -44,6 +47,11 @@ yarn add @0xdoublesharp/bin-packing-wasm
 
 ## Usage
 
+See the [complete JavaScript API guide](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/bindings.md)
+for physical/objective examples and the
+[generated reference](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/reference.md)
+for exports, defaults and supported entry points.
+
 The explicit-objective APIs are `solve1dOptimized`, `solve2dOptimized` and
 `solve3dOptimized`. Requests contain `{ packing, profits?, minimum_quantities? }`;
 options select `bin_count`, `total_cost`, `knapsack`, `feasibility` or supported
@@ -67,7 +75,6 @@ non-finite values and undefined array elements are rejected before JSON
 serialization. Unsafe aggregate output loads are rejected. Large area/volume
 summary metrics continue to use ordinary JSON-number precision.
 
-
 The additional APIs are `solve1dMinCost`, `solve2dConstrained`,
 `solve3dConstrained`, `solve2dAdaptive` and `lowerBound2d`. Dimension-specific
 WASM builds expose the corresponding dimension's APIs. Constrained requests
@@ -87,20 +94,25 @@ helpers. The full build also includes `solveIrregularJson`.
 The package ships combined targets plus smaller dimension-specific targets via
 the `exports` map, so a single install works everywhere:
 
-| Import specifier | Target | Requires `init()`? |
-| ---- | ---- | ---- |
-| `@0xdoublesharp/bin-packing-wasm` | Combined 1D+2D+3D+irregular, bundlers (Vite, webpack, esbuild, Next.js, Rollup, Parcel) | No |
-| `@0xdoublesharp/bin-packing-wasm/web` | Combined 1D+2D+3D+irregular, browsers, Deno, native ES modules | Yes (`await init()`) |
-| `@0xdoublesharp/bin-packing-wasm/nodejs` | Combined 1D+2D+3D+irregular, Node.js, Bun | No |
-| `@0xdoublesharp/bin-packing-wasm/one-d` | 1D-only, bundlers | No |
-| `@0xdoublesharp/bin-packing-wasm/one-d/web` | 1D-only, browsers, Deno, native ES modules | Yes (`await init()`) |
-| `@0xdoublesharp/bin-packing-wasm/one-d/nodejs` | 1D-only, Node.js, Bun | No |
-| `@0xdoublesharp/bin-packing-wasm/two-d` | 2D-only, bundlers | No |
-| `@0xdoublesharp/bin-packing-wasm/two-d/web` | 2D-only, browsers, Deno, native ES modules | Yes (`await init()`) |
-| `@0xdoublesharp/bin-packing-wasm/two-d/nodejs` | 2D-only, Node.js, Bun | No |
-| `@0xdoublesharp/bin-packing-wasm/three-d` | 3D-only, bundlers | No |
-| `@0xdoublesharp/bin-packing-wasm/three-d/web` | 3D-only, browsers, Deno, native ES modules | Yes (`await init()`) |
-| `@0xdoublesharp/bin-packing-wasm/three-d/nodejs` | 3D-only, Node.js, Bun | No |
+<!-- BEGIN GENERATED: wasm-imports -->
+| Import | Target / initialization |
+| --- | --- |
+| `@0xdoublesharp/bin-packing-wasm` | bundler: WASM ESM support |
+| `@0xdoublesharp/bin-packing-wasm/web` | web: await init() |
+| `@0xdoublesharp/bin-packing-wasm/nodejs` | nodejs: synchronous |
+| `@0xdoublesharp/bin-packing-wasm/one-d` | bundler: WASM ESM support |
+| `@0xdoublesharp/bin-packing-wasm/one-d/web` | web: await init() |
+| `@0xdoublesharp/bin-packing-wasm/one-d/nodejs` | nodejs: synchronous |
+| `@0xdoublesharp/bin-packing-wasm/two-d` | bundler: WASM ESM support |
+| `@0xdoublesharp/bin-packing-wasm/two-d/web` | web: await init() |
+| `@0xdoublesharp/bin-packing-wasm/two-d/nodejs` | nodejs: synchronous |
+| `@0xdoublesharp/bin-packing-wasm/three-d` | bundler: WASM ESM support |
+| `@0xdoublesharp/bin-packing-wasm/three-d/web` | web: await init() |
+| `@0xdoublesharp/bin-packing-wasm/three-d/nodejs` | nodejs: synchronous |
+| `@0xdoublesharp/bin-packing-wasm/irregular` | bundler: WASM ESM support |
+| `@0xdoublesharp/bin-packing-wasm/irregular/web` | web: await init() |
+| `@0xdoublesharp/bin-packing-wasm/irregular/nodejs` | nodejs: synchronous |
+<!-- END GENERATED: wasm-imports -->
 
 ### Bundler (Vite / webpack / esbuild / Next.js)
 
@@ -140,8 +152,9 @@ const cutPlan = plan2dCuts(layout, { preset: 'table_saw' });
 //   .num_cuts, .num_rotations, .num_fence_resets, .num_tool_ups, .travel_distance
 ```
 
-Modern bundlers load the accompanying `.wasm` file automatically. Vite and
-webpack 5+ need no configuration; older toolchains may need a wasm loader.
+The bundler target imports its `.wasm` module. Enable WebAssembly ESM support
+in your bundler; some setups require a WASM plugin or configuration. Use the
+`/web` target with explicit initialization when loading the module by URL.
 
 For browser payloads that only need one dimension, import the smaller
 dimension-specific entry point:
@@ -150,11 +163,9 @@ dimension-specific entry point:
 import { solve2d } from '@0xdoublesharp/bin-packing-wasm/two-d';
 ```
 
-The [October 28 expansion build](../../docs/experiments/2026-10-28-packingsolver-completion.md)
-recorded uncompressed web WASM assets of approximately 380 KiB for 1D,
-873 KiB for 2D, 911 KiB for 3D, 753 KiB for irregular-only and 2.25 MiB for
-combined 1D+2D+3D+irregular. These figures exclude JavaScript wrappers and transfer
-compression; run the build locally for current sizes.
+Payload size depends on the selected models, target and toolchain. The
+[dated expansion report](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/experiments/2026-10-28-packingsolver-completion.md)
+records measured sizes; build the current tree to measure a new release.
 
 ### Browser (raw ES modules / Deno)
 
@@ -174,7 +185,7 @@ from a URL:
         { name: 'panel', width: 24, height: 18, quantity: 4, can_rotate: true },
       ],
     },
-    { algorithm: 'auto', seed: 42, min_usable_side: 12 },
+    { algorithm: 'auto', guillotine_required: true, seed: 42, min_usable_side: 12 },
   );
 
   console.log(layout.sheet_count, layout.total_waste_area);
@@ -209,8 +220,18 @@ setup required.
 
 ### CommonJS
 
+<!-- bin-packing:example -->
 ```js
-const { solve1d } = require('@0xdoublesharp/bin-packing-wasm/nodejs');
+const assert = require('node:assert/strict');
+const { solve1d, plan1dCuts, version } = require('@0xdoublesharp/bin-packing-wasm/nodejs');
+const problem = {
+  stock: [{ name: 'bar', length: 10 }],
+  demands: [{ name: 'rail', length: 5, quantity: 2 }],
+};
+const solution = solve1d(problem, { algorithm: 'first_fit_decreasing' });
+assert.equal(solution.stock_count, 1);
+assert.equal(plan1dCuts(problem, solution).bar_plans[0].num_cuts, 1);
+assert.match(version(), /^\d+\.\d+\.\d+$/);
 ```
 
 ### Edge kerf relief
@@ -255,13 +276,15 @@ Throws when `table_saw` or `panel_saw` is used on a non-guillotine layout
 (`NonGuillotineNotCuttable`) or when a cost override is invalid
 (`InvalidOptions`). Use `cnc_router` as the universal fallback for any layout.
 
-### `plan1dCuts(solution, options?)`
+### `plan1dCuts(problem, solution, options?)`
 
 ```ts
-function plan1dCuts(solution: OneDSolution, options?: CutPlanOptions1D): CutPlanSolution1D;
+function plan1dCuts(problem: OneDProblem, solution: OneDSolution, options?: CutPlanOptions1D): CutPlanSolution1D;
 ```
 
-Generates an ordered cut plan for every bar in a finished `OneDSolution`. The
+Generates an ordered cut plan for every bar in a finished `OneDSolution`.
+Pass the original problem as the first argument so kerf comes from the stock
+definitions. The
 only preset is `chop_saw`. Each `bar_plans` entry carries ordered `steps`
 (`cut` and `fence_reset`) and a `total_cost`.
 
@@ -280,8 +303,10 @@ Algorithms (`options.algorithm`):
 - `first_fit_decreasing`
 - `best_fit_decreasing`
 - `local_search` — multistart; honors `seed`, `multistart_runs`, `improvement_rounds`
-- `column_generation` — exact backend; reports `exact: true` and a
-  `lower_bound` when optimal
+- `column_generation` — single uncapped stock type only; other configurations
+  throw. `exact: true` requires complete pattern enumeration and integer search.
+  An optimal result found under a capped enumeration can still be non-exact;
+  `lower_bound` is a certified LP or conservative length/capacity bound.
 
 ### `solve2d(problem, options?)`
 
@@ -369,7 +394,8 @@ import type {
 
 ## Performance notes
 
-- Browser WASM is ~1.5–3× slower than native for CPU-bound integer code.
+- Native and WASM runtime varies with workload and host. Use dated measurements
+  for timing claims, and benchmark the selected model in the target environment.
 - The default `Auto` mode runs many strategies — for interactive UIs, pick a
   specific fast algorithm like `first_fit_decreasing_height` or
   `max_rects_best_short_side_fit`.
@@ -394,13 +420,13 @@ pnpm run build
 pnpm test
 ```
 
-## License
-
-MIT.
-
-### Workpiece-aware saw jobs
+## Workpiece-aware saw jobs
 
 `plan2dSawCuts(job, options?)` is available in combined and `two-d` builds for every
 target. It accepts explicit stock/demand provenance and returns one authoritative
-physical schedule. See [the API and migration guide](../../docs/two-d/saw-planner.md).
+physical schedule. See [the API and migration guide](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/two-d/saw-planner.md).
 After building, run `node ../../examples/saw-planner.mjs wasm` or use `two-d`.
+
+## License
+
+MIT.

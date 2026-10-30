@@ -19,6 +19,11 @@ pnpm add @0xdoublesharp/bin-packing
 
 ## Usage
 
+See the [complete JavaScript API guide](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/bindings.md)
+for physical/objective examples and the
+[generated reference](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/reference.md)
+for exports, defaults and supported entry points.
+
 The explicit-objective APIs are `solve1dOptimized`, `solve2dOptimized` and
 `solve3dOptimized`. Requests contain `{ packing, profits?, minimum_quantities? }`;
 options select `bin_count`, `total_cost`, `knapsack`, `feasibility` or supported
@@ -42,7 +47,6 @@ non-finite values and undefined array elements are rejected before JSON
 serialization. Unsafe aggregate output loads are rejected. Large area/volume
 summary metrics continue to use ordinary JSON-number precision.
 
-
 The additional APIs are `solve1dMinCost`, `solve2dConstrained`,
 `solve3dConstrained`, `solve2dAdaptive` and `lowerBound2d`. Dimension-specific
 WASM builds expose the corresponding dimension's APIs. Constrained requests
@@ -54,6 +58,7 @@ Budgets count algorithm calls or successor states, rather than wall time;
 adaptive count certificates cover sheet count only. Existing solvers keep their
 ranking.
 
+<!-- bin-packing:example -->
 ```js
 const { solve1d, solve2d, solve3d } = require('@0xdoublesharp/bin-packing');
 
@@ -77,7 +82,7 @@ const sheets = solve2d(
       { name: 'panel', width: 24, height: 18, quantity: 4, can_rotate: true },
     ],
   },
-  { algorithm: 'auto', min_usable_side: 12 },
+  { algorithm: 'auto', guillotine_required: true, min_usable_side: 12 },
 );
 
 // 2D cut plan — generate an ordered cut sequence from a finished layout
@@ -148,9 +153,11 @@ Throws when `table_saw` or `panel_saw` is used on a non-guillotine layout
 (`NonGuillotineNotCuttable`) or when a cost override is invalid
 (`InvalidOptions`). Use `cnc_router` as the universal fallback.
 
-### `plan1dCuts(solution, options?)`
+### `plan1dCuts(problem, solution, options?)`
 
 Generates an ordered cut plan for every bar in a finished `OneDSolution`.
+Pass the original problem as the first argument so kerf comes from the stock
+definitions.
 The only preset is `chop_saw`. The returned plan carries per-bar steps
 (`cut` and `fence_reset`) and a `total_cost`.
 
@@ -194,14 +201,14 @@ For browsers, Deno, Cloudflare Workers, or environments without native
 binaries, see
 [`@0xdoublesharp/bin-packing-wasm`](https://www.npmjs.com/package/@0xdoublesharp/bin-packing-wasm).
 
-## License
-
-MIT
-
-### Workpiece-aware saw jobs
+## Workpiece-aware saw jobs
 
 `plan2dSawCuts(job, options?)` is the opt-in physical planner. Supply the original
 problem, layouts, and explicit stock/demand index maps. It returns one ordered job
 with workpiece ancestry, kerf bands, real settings and measured operation counts.
-See [the API and migration guide](../../docs/two-d/saw-planner.md) and run
+See [the API and migration guide](https://github.com/doublesharp/bin-packing/blob/v0.6.0/docs/two-d/saw-planner.md) and run
 `node ../../examples/saw-planner.mjs native` after building this package.
+
+## License
+
+MIT.

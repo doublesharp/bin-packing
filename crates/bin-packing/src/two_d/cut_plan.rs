@@ -1,8 +1,8 @@
 //! 2D cut sequencing: guillotine cut trees for single-blade machines,
 //! tool paths for CNC routers.
 //!
-//! See `docs/superpowers/specs/2026-04-15-cut-sequencer-design.md` for
-//! the design rationale.
+//! See `docs/two-d/README.md` for legacy sequencing and
+//! `docs/two-d/saw-planner.md` for workpiece-aware physical schedules.
 
 use serde::{Deserialize, Serialize};
 

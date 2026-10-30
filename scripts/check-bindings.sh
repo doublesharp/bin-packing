@@ -21,6 +21,7 @@ npm --prefix bindings/node test
 npm --prefix bindings/wasm test
 node bindings/test/package-native.cjs
 node bindings/test/package-wasm.mjs
+node bindings/test/docs-examples.cjs
 node bindings/test/package-types.mjs ${TSC_PATH:+"$TSC_PATH"}
 node bindings/test/solver-finder.cjs --cases 300
 node bindings/test/package-browser.cjs ${PLAYWRIGHT_PATH:+"$PLAYWRIGHT_PATH"}

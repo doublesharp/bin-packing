@@ -81,3 +81,7 @@ required-features = ["one-d", "two-d", "three-d"]
 [[example]]
 name = "packingsolver_compare"
 required-features = ["one-d", "two-d", "three-d", "irregular"]
+
+[[example]]
+name = "doc_reference"
+required-features = ["one-d", "two-d", "three-d", "irregular"]

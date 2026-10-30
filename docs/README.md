@@ -51,7 +51,7 @@ See [v0.6.0](releases/v0.6.0.md) for release and compatibility notes and the
 
 † Column generation proves optimality only when it enumerates the full
 pattern set under `exact_pattern_limit`. Otherwise it returns the best
-solution it found with an LP lower bound.
+solution it found with a certified LP or conservative length/capacity bound.
 
 ## 2D algorithms
 
@@ -79,6 +79,21 @@ solution it found with an LP lower bound.
 | Branch and Bound | [three-d/branch-and-bound.md](three-d/branch-and-bound.md) | No | No |
 | Auto | [three-d/auto.md](three-d/auto.md) | Optional | Indirectly |
 
+## Development and publication
+
+- [Generated reference](reference.md): versions, features, binding exports and
+  serialized defaults, checked against source at every publication.
+- [JavaScript guide](bindings.md): runnable examples for ordinary and physical APIs.
+- [Verification](workspace-verification.md), [testing and coverage](testing-confidence.md),
+  and [Scratch storage](scratch-builds.md).
+- [Documentation maintenance](documentation.md) and [release runbook](releasing.md).
+- [1D arc-flow](one-d/arc-flow.md), [2D bounded searches and reuse](two-d/bounded-searches.md),
+  and [3D bin repair](three-d/repaired.md).
+
+Dated [experiment reports](experiments/) and [implementation plans](superpowers/plans/)
+are historical evidence. Their counts, versions and timings describe the named
+snapshots rather than the latest release.
+
 ## Reading notes
 
 **Complexity.** Complexity is given in terms of `n = total number of piece
@@ -88,7 +103,8 @@ not change asymptotic complexity — they add a constant factor per placement.
 
 **Determinism.** Every algorithm that does not mention `seed` is
 deterministic in the input order. Algorithms that do honor `seed` produce
-bit-identical output for the same `(problem, options, seed)` triple. When
+identical output for the same `(problem, options, seed)` triple within a backend
+and toolchain. Native and WASM can differ because `SmallRng` depends on architecture. When
 `seed = None`, randomized algorithms fall back to a fixed internal default
 seed, so runs are still reproducible across processes.
 

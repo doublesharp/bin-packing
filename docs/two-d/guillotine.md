@@ -197,16 +197,15 @@ rectangles for later large items.
 
 ## Beam width
 
-`TwoDOptions.beam_width` (default `8`) controls the beam size. At
+`TwoDOptions.beam_width` controls the beam size. At
 `beam_width = 1` the algorithm degrades to a pure greedy construction.
 At `beam_width = ∞` (not recommended) it becomes exhaustive over the
 top-6 per-state branching, which is still a small fraction of the full
 search tree.
 
-Higher beam widths typically improve packing density by 1–3% at the
-cost of linear time and memory. A value of 8 is a good default for
-problems up to several hundred items; 16 or 32 makes sense if you are
-willing to trade seconds for a tighter result.
+Higher beam widths retain more alternatives and increase time and memory.
+Measure the quality/runtime tradeoff on representative inputs; a wider beam
+does not establish an application latency ceiling.
 
 ## Complexity
 
@@ -281,3 +280,5 @@ Source: [`crates/bin-packing/src/two_d/guillotine.rs`](../../crates/bin-packing/
 `solve_guillotine_min_area_split`, `solve_guillotine_max_area_split`,
 `GuillotineStrategy::compare`, `push_split_candidates`,
 `preferred_split_axis`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

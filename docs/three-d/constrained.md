@@ -42,7 +42,7 @@ objectives: count is minimal, and cost/waste are fixed. The beam is skipped in
 that case and `explored_states` is zero. This shortcut does not invoke the ordinary
 Auto ensemble.
 
-Defaults are beam width 8 and 4,096 successor states. `max_states = 0` returns the
+Default search settings are in the [generated reference](../reference.md#constrainedoptions3d). `max_states = 0` returns the
 better constructor incumbent. Accepted maxima are 256 total items, 64 demand
 types, 16 bin types, beam width 32 and 100,000 successor states. Each expansion retains at most
 16 placement moves and each open bin at most 128 maximal free cuboids.
@@ -73,3 +73,5 @@ claims. Validation is quadratic in placements per bin and linear in remaining
 source/metadata size. A malformed constraint returns structured
 `BinPackingError::InvalidConstraint`; inconsistent output returns
 `BinPackingError::InvalidSolution`.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

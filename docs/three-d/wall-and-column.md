@@ -100,3 +100,5 @@ let columns = solve_3d(
 
 Source: [`crates/bin-packing/src/three_d/wall.rs`](../../crates/bin-packing/src/three_d/wall.rs)
 and [`crates/bin-packing/src/three_d/column.rs`](../../crates/bin-packing/src/three_d/column.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

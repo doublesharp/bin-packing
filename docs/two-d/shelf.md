@@ -207,3 +207,5 @@ All three variants:
 Source: [`crates/bin-packing/src/two_d/shelf.rs`](../../crates/bin-packing/src/two_d/shelf.rs)
 (see `solve_nfdh`, `solve_ffdh`, `solve_bfdh`, `ShelfStrategy`,
 `choose_existing_shelf`, `choose_new_shelf`, `compare_existing_candidates`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

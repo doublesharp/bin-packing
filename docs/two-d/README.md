@@ -27,6 +27,19 @@ family appear as H2 sections on the family page.
 **Twenty individually selectable algorithm names** cover the cross-product
 of family × variant. See each family page for the full list.
 
+## Additional entry points
+
+- [Constraints](constrained.md), [staged cut trees](staged.md) and
+  [explicit objectives](../objectives.md) retain source identity and physical rules.
+- [Adaptive search](adaptive.md) and [lower bounds](bounds.md) can certify minimum
+  sheet count when a complete packing meets a conservative bound.
+- [Bounded Rust searches](bounded-searches.md) add pattern recombination,
+  demand-aware placement, mixed rotations and forecast-aware offcut reuse.
+- [Workpiece-aware saw planning](saw-planner.md) schedules an existing layout
+  with explicit source provenance.
+
+See the [generated reference](../reference.md) for effective default options.
+
 ## Problem shape
 
 ```rust
@@ -142,7 +155,7 @@ the exact definition of guillotine-compatibility.
 
 ## Kerf
 
-Each `Sheet2D` accepts an optional `kerf: u32` field (default `0`). When
+Each `Sheet2D` accepts an optional `kerf: u32` field. When
 non-zero, the solver enforces a minimum gap of `kerf` units between every pair
 of placements that share an edge — that is, between any two rectangles whose
 faces would otherwise be adjacent after cutting.
@@ -164,10 +177,11 @@ Two new fields report the kerf area consumed:
   semantics are unchanged: `sheet_area - used_area`).
 - `TwoDSolution.total_kerf_area` — sum of `kerf_area` across all layouts.
 
-For the full design rationale and edge-case rules (D1–D7), see the spec at
-[docs/superpowers/specs/2026-04-14-kerf-aware-2d-design.md](../superpowers/specs/2026-04-14-kerf-aware-2d-design.md).
+See the [kerf regressions](../../crates/bin-packing/tests/kerf_2d_regressions.rs)
+and [edge-relief regressions](../../crates/bin-packing/tests/edge_kerf_relief_2d.rs)
+for executable boundary cases.
 
-### `edge_kerf_relief` (default `false`)
+### `edge_kerf_relief`
 
 When `true`, the trailing placement on a sheet may extend up to one
 `kerf` past the sheet's right and bottom edges. Use this when the
@@ -309,8 +323,9 @@ pub struct CutPlanSolution2D {
 }
 ```
 
-For the full design rationale and algorithmic details, see the spec at
-[docs/superpowers/specs/2026-04-15-cut-sequencer-design.md](../superpowers/specs/2026-04-15-cut-sequencer-design.md).
+For a physical table/panel-saw job with workpiece ancestry, blade bands and
+explicit provenance, use the [workpiece-aware saw planner](saw-planner.md).
+The legacy cut sequence above is a separate layout post-processor.
 
 ## Reproducibility
 

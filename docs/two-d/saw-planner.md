@@ -40,7 +40,7 @@ Rust failures use the separate, non-exhaustive `SawPlanError2D`: invalid problem
 - `fewest_cuts` minimizes physical passes.
 - `weighted_effort` minimizes `cuts × cut + initial_setups × initial_setup + setup_changes × setup_change + rotations × rotation + handling × handling`.
 
-Ties use weighted effort, cuts, total setups, rotations, handling, then stable candidate order. Initial setups count toward the setup objective because opening another accessory is real setup work. Default weights are cut=1, initial_setup=5, setup_change=5, rotation=2 and handling=1. Weights must be finite and between 0 and 1e100. They are abstract effort units, separate from material cost; the score is not estimated time.
+Ties use weighted effort, cuts, total setups, rotations, handling, then stable candidate order. Initial setups count toward the setup objective because opening another accessory is real setup work. Effective default weights are in the [generated reference](../reference.md#sawweights2d). Weights must be finite and between 0 and 1e100. They are abstract effort units, separate from material cost; the score is not estimated time.
 
 The deterministic algorithm:
 
@@ -50,7 +50,7 @@ The deterministic algorithm:
 
 The baseline remains an incumbent. For weighted effort, the result's score cannot exceed `baseline_effort_score`. For the other objectives, the guarantee is lexicographic: a lower primary count may legitimately have higher effort. Abandoned partial states never replace a completed schedule.
 
-Defaults are 20,000 attempted baseline geometric splits, 4,000 optimization successor evaluations and beam width 32. Allowed maxima are 100,000 baseline split attempts, 100,000 optimization evaluations and beam width 256. `max_states: 0` returns the validated baseline. Construction failure is explicit; optimization budget exhaustion returns the best completed incumbent. Baseline attempts include candidates rejected for intersecting a required part; scoring reference edges does not consume that budget. Optimization evaluations include dry-scored alternatives in the preliminary tree scheduling pass. Time spent validating, enumerating boundaries or alternative geometry, and serializing is outside those counts, so this is a deterministic effort bound, not a wall-clock deadline.
+Default search settings are in the [generated reference](../reference.md#sawsearchlimits2d). Allowed maxima are 100,000 baseline split attempts, 100,000 optimization evaluations and beam width 256. `max_states: 0` returns the validated baseline. Construction failure is explicit; optimization budget exhaustion returns the best completed incumbent. Baseline attempts include candidates rejected for intersecting a required part; scoring reference edges does not consume that budget. Optimization evaluations include dry-scored alternatives in the preliminary tree scheduling pass. Time spent validating, enumerating boundaries or alternative geometry, and serializing is outside those counts, so this is a deterministic effort bound, not a wall-clock deadline.
 
 For p contained parts, baseline boundary enumeration and scoring cost O(p log p), with O(p) work to validate and partition each attempted split. A successful strip decomposition therefore avoids constructing all O(p) alternatives at every step. Broader beam-search geometry queries still cost O(p²), producing O(p) candidates. A bounded cache reuses those queries across machine states. It retains at most 4,096 workpieces and 65,536 estimated storage units; larger queries are used without caching. Beam search ranks lightweight moves before allocating successor states; retained moves share only their selected split. Search traces share prefixes, ready states share immutable workpieces, and strings remain in the input. Baseline traversal is iterative to avoid recursion proportional to the cut count.
 
@@ -76,3 +76,5 @@ node examples/saw-planner.mjs two-d
 ```
 
 Build the Node and WASM bindings first using their existing `build` scripts. See [measured schedules and performance](saw-planner-results.md), [test audit and updated benchmarks](saw-planner-test-audit.md) and [future packing search design](effort-aware-packing.md).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

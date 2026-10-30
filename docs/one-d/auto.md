@@ -35,10 +35,9 @@ only when every condition holds:
 - **Unlimited inventory** — `problem.stock[0].available.is_none()`.
   Column generation does not model capped inventory.
 - **Small demand surface** —
-  `problem.demands.len() <= options.auto_exact_max_types` (default `14`).
+  `problem.demands.len() <= options.auto_exact_max_types`.
 - **Small total quantity** —
-  `problem.total_quantity() <= options.auto_exact_max_quantity`
-  (default `96`).
+  `problem.total_quantity() <= options.auto_exact_max_quantity`.
 
 When any of these fails, Auto returns the best of FFD/BFD/local search.
 When the gate opens, Auto calls `solve_exact` but *does not* propagate
@@ -115,7 +114,7 @@ Every option inherited from the underlying algorithms applies:
   precisely because Auto is safe across all instance shapes and
   escalates to the exact backend automatically when the instance is
   small enough to benefit.
-- When you want **the best answer the library can produce** without
+- When you want **the best answer in the configured Auto portfolio** without
   having to manually pick an algorithm.
 - When you want **optimality proofs on small instances** without
   writing gate logic yourself — Auto applies the exact gate for you.
@@ -125,9 +124,9 @@ Every option inherited from the underlying algorithms applies:
 - When you know **you don't need the exact backend** and want to skip
   the LP cost on medium instances where Auto would try and reject it.
   Call `LocalSearch` directly.
-- When you need **predictable worst-case timing** — Auto can spend
-  most of its budget in the exact backend if the gate opens. Call
-  the specific heuristic you want if you need a latency ceiling.
+- When you want less work than the Auto portfolio. Select a particular
+  heuristic to omit LP/pattern search, and enforce any application runtime
+  deadline outside the synchronous solver.
 
 ## Rust entry point
 
@@ -151,3 +150,5 @@ let solution = solve_1d(
 
 Source: [`crates/bin-packing/src/one_d/mod.rs`](../../crates/bin-packing/src/one_d/mod.rs)
 (see `solve_1d`, `solve_auto`, `estimate_required_stock_counts`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

@@ -19,15 +19,18 @@ instances.
 
 ## Lower bounds
 
-The solver computes:
+The solver evaluates at most nine integer conservative scales per axis. For
+axis capacity `C`, scales include identity and `q = floor(C/(k+1)) + 1` for
+`k` from one through eight. Item extents and bin capacity are divided by `q`
+with integer floor rounding. Each scale preserves feasible interval-chain
+capacity, so transformed item volume divided by transformed bin volume is a
+valid count lower bound. The maximum over at most `9^3` combinations is reported
+as `solution.lower_bound`.
 
-- **L0**: volume lower bound, `ceil(total_item_volume / bin_volume)`.
-- **L1**: fat-item lower bound. Any item whose width, height, and depth are
-  all strictly greater than half of the bin's matching extent needs its own
-  bin.
-- **L2**: `max(L0, L1)`.
-
-`solution.lower_bound` is set to `Some(L2 as f64)`.
+This includes ordinary volume and greater-than-half restrictions and can detect
+stronger multi-slot cases. It is a bounded family, not every possible bound.
+Work is independent of expanded quantity and linear in source demand types per
+scale combination. See [bounds.rs](../../crates/bin-packing/src/three_d/bounds.rs).
 
 ## Search
 
@@ -38,19 +41,20 @@ The solver computes:
    Points volume-fit engine to choose the in-bin anchor.
 5. Add one more branch that opens a fresh bin for the item.
 6. Prune branches whose current bin count cannot beat the incumbent.
-7. Stop early if the incumbent bin count equals L2.
+7. Stop early if the incumbent bin count equals the conservative-scale lower bound.
 8. Stop when `branch_and_bound_node_limit` expanded nodes has been reached.
 
-If the search reaches the node limit before proving optimality, it returns
-the best incumbent with `exact = false`. If no incumbent exists yet, a greedy
+Only an incumbent matching the lower bound before a recorded limit cutoff
+sets `exact = true`. Exhausting the restricted placement search does not prove
+count optimality. A node cutoff returns the best incumbent with `exact = false`. If no incumbent exists yet, a greedy
 fallback produces a valid non-exact solution.
 
 ## Metrics
 
 - `metrics.branch_and_bound_nodes`: number of expanded B&B nodes.
 - `metrics.explored_states`: same node count.
-- `metrics.notes`: includes L0, L1, L2, expanded nodes, and whether the limit
-  was reached.
+- `metrics.notes`: includes `conservative_scale_bound`, expanded nodes and
+  whether the node limit was reached.
 
 ## When to use it
 
@@ -79,3 +83,5 @@ if solution.exact {
 ```
 
 Source: [`crates/bin-packing/src/three_d/exact.rs`](../../crates/bin-packing/src/three_d/exact.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

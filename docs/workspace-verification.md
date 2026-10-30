@@ -1,8 +1,16 @@
-# Workspace verification and efficiency follow-up
+# Workspace and package verification
 
-September 9, 2026. This continues the [saw-planner test audit](two-d/saw-planner-test-audit.md) across the Rust workspace, native Node package, twelve WASM entry points and separate fuzz project.
+Use the commands below for the current source tree. The [generated reference](reference.md)
+records versions, features, exports and default controls, while the [testing guide](testing-confidence.md)
+records the verification policy. Historical fixes and measurements below describe
+the September workspace follow-up and its original source snapshot.
 
-## Fixed defects
+## Historical fixes and measurements
+
+The following fixes and timing samples were recorded during the earlier workspace
+follow-up. They are not a fresh measurement of the current release.
+
+### Fixed defects
 
 - Rotation search shifted a single u64 mask by 64 or more bits. Sampled assignments now use as many words as needed. Regressions cover 63, 64, 65 and 129 rotatable demand types.
 - Pre-swapping dimensions erased rotation provenance and changed unplaced demands. An internal fixed-orientation field now preserves source dimensions, rotation permission and placement flags. A rotated 1×2 part on 2×1 stock also passes directly into saw planning. The 3D layer, column and wall adapters retain their original unrestricted behavior.
@@ -13,7 +21,7 @@ September 9, 2026. This continues the [saw-planner test audit](two-d/saw-planner
 - Dimension-specific Rust tests and benches could not compile without all features; WASM's JSON-only feature could not compile; native feature flags unintentionally inherited every core default feature. Target requirements, conditional helpers and dependency flags now match the intended builds.
 - Individual WASM `build:*` commands bypassed package normalization. Each now uses the common build script, including CJS renaming and declaration installation, and rebuilds only the requested flavor.
 
-## Performance evidence
+### Performance evidence
 
 Beam search now ranks lightweight moves before allocating operation traces and successor states. Selected moves retain only their selected split, allowing unused geometry to be released. Completed candidates still update the incumbent immediately, and comparison, budget and pruning order are preserved. Thirty-six fixed job/option combinations matched the previous native output exactly.
 
@@ -33,8 +41,7 @@ These samples show 33–69% lower median latency on the 32–128-part fixtures. 
 Reproduce the resource workload on macOS:
 
 ```sh
-cargo build -p bin-packing --example saw_stress --release --no-default-features --features two-d --locked
-/usr/bin/time -l target/release/examples/saw_stress
+python3 scripts/scratch.py run sh -c 'cargo build -p bin-packing --example saw_stress --release --no-default-features --features two-d --locked && /usr/bin/time -l "$CARGO_TARGET_DIR/release/examples/saw_stress"'
 ```
 
 The resource probe's cut counts and search budget are portable. The profiler command and instruction/footprint counters are platform-specific.
@@ -53,23 +60,30 @@ PLAYWRIGHT_PATH=/path/to/node_modules/playwright \
 ./scripts/check-bindings.sh
 ```
 
-The feature matrix exercises eight core/native combinations and nine WASM combinations, then formats and lints both separate fuzz targets. Mixed-dimension integration suites declare required features; dimension unit tests and relevant integration suites still run independently.
+The feature matrix is defined by `scripts/check-features.sh`. It exercises the
+core/native and WASM dimensions separately, including irregular-only builds,
+then formats and lints the separate fuzz project. Mixed-dimension integration suites declare required features; dimension unit tests and relevant integration suites still run independently.
 
-The binding tool installs the locked native build dependencies, builds both packages, runs smoke and contract tests, packs and loads both npm archives in temporary directories, compiles runtime values against all thirteen declaration entry points, runs the seeded finder and checks all four web variants in Chromium. Use `--skip-build` only after building the current tree. Without tool-path variables it resolves `tsc` and `playwright` normally. Archives use a temporary npm cache and are never published by the tool.
+The binding tool installs the locked native build dependencies, builds both packages, runs smoke and contract tests, packs and loads both npm archives in temporary directories, compiles runtime values against every declared package entry point, runs the seeded finder and checks all configured web variants in Chromium. Use `--skip-build` only after building the current tree. Without tool-path variables it resolves `tsc` and `playwright` normally. Archives use a temporary npm cache and are never published by the tool.
 
-The counterexample finder is dependency-free after binding builds:
+The binding gate also executes marked [documentation examples](bindings.md)
+against both rebuilt backends. Quality CI checks generated documentation, local
+links and complete Rust examples. See [documentation maintenance](documentation.md).
+
+The counterexample finder is dependency-free after binding builds. With Scratch
+configured, use the wrapper so captures and temporary files stay off the source volume:
 
 ```sh
-node bindings/test/solver-finder.cjs --seed 42 --cases 1000
-node bindings/test/solver-finder.cjs --replay fuzz/artifacts/solver-finder.json
-node --test bindings/test/finder.test.cjs
+python3 scripts/scratch.py run node bindings/test/solver-finder.cjs --seed 42 --cases 1000
+python3 scripts/scratch.py run node bindings/test/solver-finder.cjs --replay fuzz/artifacts/solver-finder.json
+python3 scripts/scratch.py run node --test bindings/test/finder.test.cjs
 ```
 
 It generates bounded asymmetric 1D, 2D and 3D problems with varying inventory, kerf and rotation permissions. Each input runs twice through native, combined WASM and the corresponding specialized WASM binding. It checks dimensions, demand accounting, inventory, non-overlap, adjacent-edge kerf gaps, costs, area/volume metrics and reproducibility. Deterministic constructors must also agree across backends. Sampled algorithms may differ between 32-bit WASM and 64-bit native because `SmallRng` uses different implementations; each result must still pass physical checks and reproduce within its backend. Failures save the exact input, options, seed and case index for replay. The first failure stops the run. Mutation tests prove it rejects missing demand, incorrect rotation metadata and insufficient adjacent kerf while accepting valid diagonal separation.
 
-## Verification and limits
+## Historical verification and limits
 
-Local verification uses macOS arm64, Node v24.16.0 and Chromium 151.0.7922.34. Native package checks cover the available host binary; the other five platform binaries require the configured release CI runners. All twelve WASM entry points are loaded through package exports, both before and after packing. Browser checks execute the four web variants, and bundler entry points additionally execute under Node's experimental WASM module loader. This does not certify every third-party bundler's tree-shaking configuration.
+The earlier recorded verification used macOS arm64, Node v24.16.0 and Chromium 151.0.7922.34. Native package checks cover the available host binary; the other five platform binaries require the configured release CI runners. At that snapshot, all twelve WASM entry points are loaded through package exports, both before and after packing. That browser run executed four web variants, and bundler entry points additionally execute under Node's experimental WASM module loader. This does not certify every third-party bundler's tree-shaking configuration.
 
 The full quality gate passed 344 Rust tests. Binding suites passed 43 tests, in addition to archive, declaration and browser checks.
 
@@ -78,10 +92,18 @@ The finder passed 2,300 jobs across three seeds, totaling 13,800 solver calls in
 Fuzz runs are reproducible with the existing nightly toolchain and cargo-fuzz:
 
 ```sh
-cargo +nightly fuzz run solver_inputs -- -runs=4000 -max_len=2048
-cargo +nightly fuzz run three_d_modules -- -runs=2000 -max_len=2048
+python3 scripts/scratch.py run cargo +nightly fuzz run solver_inputs -- -runs=4000 -max_len=2048
+python3 scripts/scratch.py run cargo +nightly fuzz run three_d_modules -- -runs=2000 -max_len=2048
 ```
 
 These tests are bounded evidence, not exhaustive correctness proofs. No package was published and no other repository was modified.
 
 Raw run evidence is stored outside git under `/Volumes/Scratch/bin-packing/reports/release-v0.5.0-20261017/docs/two-d/saw-planner-data/`.
+
+## Release evidence
+
+For later model expansion, package/browser qualification and measured coverage,
+see the dated reports linked from [testing confidence](testing-confidence.md).
+Re-run the release gates for a new publication; historical counts do not qualify
+a new artifact. The [release runbook](releasing.md) separates local checks, CI,
+registry publication and docs.rs availability.

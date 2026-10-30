@@ -25,6 +25,16 @@ outer-loop policy.
 | **Branch and bound** | [branch-and-bound.md](branch-and-bound.md) | Restricted exact backend | Yes |
 | **Auto** | [auto.md](auto.md) | Tiered ensemble dispatch | Partly seeded |
 
+## Additional entry points
+
+- [Payload-aware packing](constrained.md) adds indexed weights and bin payloads.
+- [Stack loading](loading.md) adds nested columns, stack limits, axles and delivery.
+- [Explicit objectives](../objectives.md) add cost, profit, feasibility and open size.
+- [Bounded bin repair](repaired.md) is an opt-in Rust search retaining the ordinary
+  solution as its incumbent.
+
+See the [generated reference](../reference.md) for effective default options.
+
 ## Problem shape
 
 ```rust
@@ -128,15 +138,17 @@ is also valid and avoids the multi-candidate overhead.
 `ThreeDOptions` fields used by current algorithms:
 
 - `algorithm`: chosen `ThreeDAlgorithm`; defaults to `Auto`.
-- `beam_width`: live beam size for the Guillotine 3D family; default `8`.
+- `beam_width`: live beam size for the Guillotine 3D family; see
+  [generated defaults](../reference.md#threedoptions).
 - `multistart_runs`: restarts for `multi_start`, `grasp`, and
   `local_search`; also gates Auto's tier-2 meta-strategy sweep.
 - `improvement_rounds`: local-search passes per restart.
 - `branch_and_bound_node_limit`: node budget for `branch_and_bound`.
 - `seed`: reproducible seed for randomized meta-strategies.
 
-The `auto_exact_max_types` and `auto_exact_max_quantity` fields control when
-`Auto` mode may escalate to the exact branch-and-bound backend.
+The `auto_exact_max_types` and `auto_exact_max_quantity` fields are retained
+for compatibility and are not used by 3D Auto. Request `BranchAndBound` explicitly
+to use the restricted exact backend.
 
 ## Reproducibility
 

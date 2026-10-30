@@ -3,7 +3,10 @@
 Run `./scripts/check-quality.sh` for the required Rust/Python test, formatting,
 metadata, Clippy and documentation gate. `./scripts/check-features.sh` checks
 isolated feature combinations; `./scripts/check-bindings.sh` builds and checks
-the native and WebAssembly packages, declarations and actual browser entry points.
+the native and WebAssembly packages, declarations, documented JavaScript examples
+and actual browser entry points. The quality gate also verifies source-derived
+[reference facts](reference.md), local links and complete Rust examples; see
+[documentation maintenance](documentation.md).
 
 The tests include independent geometry, inventory and physical constraint checks:
 

@@ -81,7 +81,7 @@ beam width 8 and `max_states = 512`. This is a targeted regression gain rather
 than a general benchmark claim.
 
 The dense mixed-rectangle regression, formerly using three sheets even at 100,000
-states, now uses two at the unchanged default 4,000-state limit. Its 15 parts fill
+states, now uses two at a 4,000-state budget. Its 15 parts fill
 840 of 864 available area units. An independently validated ten-times-scaled copy
 also uses two sheets within that budget.
 
@@ -111,3 +111,5 @@ free rectangles. Output readback checks every pair of placements; reusable-drop
 metrics use the existing O(P³) geometry helper for P placements and exclusions
 on a sheet. Repair capacity checks use an O(F² log F) union sweep over F maximal
 free rectangles. The state budget does not bound those auxiliary costs.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

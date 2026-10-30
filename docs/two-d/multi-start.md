@@ -44,9 +44,8 @@ layout.
 
 MultiStart exploits this: by randomizing the tie order among equally-
 ranked items, it explores a neighborhood of the construction tree
-that a purely greedy MaxRects never reaches. Typical improvements
-over single-shot BAF are 1–3 sheets per hundred on workloads with
-many near-identical items.
+that a single greedy MaxRects run does not reach. The quality/runtime tradeoff
+depends on the workload; compare results using the full solution ranking.
 
 ## What it does NOT randomize
 
@@ -64,7 +63,7 @@ new placement strategy.
 
 ## Options
 
-- **`multistart_runs`** (default `12`) — number of perturbed trials.
+- **`multistart_runs`** — number of perturbed trials.
   The baseline deterministic run is always executed, and the loop runs
   `multistart_runs.max(1)` perturbed trials.
 - **`seed`** — `Option<u64>`. `None` falls back to the built-in
@@ -129,3 +128,5 @@ let solution = solve_2d(
 
 Source: [`crates/bin-packing/src/two_d/maxrects.rs`](../../crates/bin-packing/src/two_d/maxrects.rs)
 (see `solve_multistart`, `multistart_ordered_items`, `pack_with_order`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

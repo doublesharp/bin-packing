@@ -7,7 +7,7 @@ ensemble is narrowed to guillotine-compatible algorithms only.
 
 ## Default ensemble (`guillotine_required = false`)
 
-Auto runs the following eleven constructions in order and keeps whichever
+Auto evaluates the following eleven constructions with this tie-breaking order and keeps whichever
 is best under `is_better_than`:
 
 1. [`max_rects`](max-rects.md#max_rects--best-area-fit-baf) — Best-Area-Fit MaxRects. Seed the `best` slot.
@@ -42,7 +42,7 @@ The ensemble is deliberately curated to cover several failure modes:
 
 **Not in the default ensemble** (reachable only via explicit selection):
 
-- [`max_rects_bottom_left`](max-rects.md#max_rects_bottom_left--bottom-left) — dominated by BAF / BSSF on bin count, kept for visualization purposes.
+- [`max_rects_bottom_left`](max-rects.md#max_rects_bottom_left--bottom-left-bl) — dominated by BAF / BSSF on bin count, kept for visualization purposes.
 - [`guillotine`](guillotine.md#guillotine--best-area-fit--beamboth) (BAF+BeamBoth) — close to `guillotine_best_short_side_fit` in practice.
 - [`guillotine_best_long_side_fit`](guillotine.md#guillotine_best_long_side_fit--blsf--beamboth), [`guillotine_longer_leftover_axis`](guillotine.md#guillotine_longer_leftover_axis--baf--llas), [`guillotine_min_area_split`](guillotine.md#guillotine_min_area_split--baf--minarea), [`guillotine_max_area_split`](guillotine.md#guillotine_max_area_split--baf--maxarea) — niche split heuristics; select explicitly if your workload needs them.
 - [`next_fit_decreasing_height`](shelf.md#next_fit_decreasing_height--nfdh), [`first_fit_decreasing_height`](shelf.md#first_fit_decreasing_height--ffdh) — typically dominated by BFDH.
@@ -91,11 +91,11 @@ ensemble order wins.
 
 ## Options inherited from the ensemble members
 
-- **`beam_width`** (default `8`) — passed to every Guillotine variant
+- **`beam_width`** — passed to every Guillotine variant
   in the ensemble.
-- **`multistart_runs`** (default `12`) — passed to `multi_start`. Not
+- **`multistart_runs`** — passed to `multi_start`. Not
   used by the single-run families.
-- **`auto_rotation_search_max_types`** (default `16`) — passed to
+- **`auto_rotation_search_max_types`** — passed to
   `rotation_search`; controls the exhaustive-vs-sampled threshold.
 - **`seed`** — passed to `multi_start` and `rotation_search`, the two
   randomized families in the ensemble. When `seed = None`, both fall
@@ -109,17 +109,16 @@ route the dispatch path.
 
 Auto's cost is the sum of its ensemble members. The default ensemble
 runs eleven constructions; the guillotine-required ensemble runs seven.
-On a medium instance (several hundred items) Auto typically takes
-tens to hundreds of milliseconds. For latency-sensitive callers that
-want a single specific algorithm, bypass Auto and call the
-explicitly-chosen `TwoDAlgorithm::<Variant>` directly.
+The `parallel` feature can evaluate independent candidates concurrently on
+native multicore hosts; WASM evaluates them sequentially. Candidate reduction
+preserves ensemble order for ties. Actual runtime depends on input and controls.
 
 ## When to use it
 
 - As the **default**. `TwoDOptions::default().algorithm` is Auto
   because Auto is the safest choice across all workload shapes: it
   runs every strong variant and returns the best result.
-- When you want **the best answer the library can produce** without
+- When you want **the best answer in the configured Auto portfolio** without
   having to profile your workload against each variant.
 - When you need **guillotine compatibility** — set
   `guillotine_required = true` and Auto runs the full Guillotine
@@ -128,11 +127,10 @@ explicitly-chosen `TwoDAlgorithm::<Variant>` directly.
 ## When to bypass it
 
 - When you have **profiled your workload** and know a specific variant
-  is consistently better. Bypassing Auto saves 5-10x the runtime.
-- When you need **hard latency guarantees**. Auto's cost is the sum of
-  its members, so worst-case latency is the slowest ensemble member
-  times the ensemble size. A direct call to [Shelf BFDH](shelf.md) or
-  a single MaxRects variant gives a predictable ceiling.
+  is consistently better. Measure the runtime saved on the actual workload.
+- When you need a smaller search workload. A direct call to [Shelf BFDH](shelf.md)
+  or a MaxRects variant avoids the ensemble. Neither selection gives an
+  application-level wall-clock deadline; enforce that outside the solver.
 
 ## Rust entry point
 
@@ -156,3 +154,5 @@ assert!(solution.guillotine);
 
 Source: [`crates/bin-packing/src/two_d/mod.rs`](../../crates/bin-packing/src/two_d/mod.rs)
 (see `solve_2d`, `solve_auto`, `solve_auto_guillotine`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

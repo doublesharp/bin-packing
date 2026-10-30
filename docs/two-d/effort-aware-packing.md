@@ -11,3 +11,5 @@ Only fully placed, physically replayable candidates qualify for final effort ran
 The first implementation should target guillotine construction and its multistart candidate pool. MaxRects and skyline candidates need physical saw validation before admission. Do not extend CNC or 1D/3D comparators implicitly. Allocation limits should independently cap packing states, Pareto candidates and cumulative planning work so a small per-plan budget cannot multiply into unbounded total effort.
 
 Acceptance requires a fixture where two layouts survive a material tie but differ in executable setup effort; one where easier cutting needs an extra sheet and is rejected by the default budget; one where explicit budget relaxation admits that layout; heterogeneous stock prices/inventory; deterministic budget exhaustion; and independent physical replay of every reported winner. Report the best candidate found, not a global packing optimum.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

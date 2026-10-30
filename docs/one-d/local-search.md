@@ -96,8 +96,8 @@ piece the best shot at finding a tight slot.
 
 ## Options that matter
 
-- **`multistart_runs`** (default `16`) — number of perturbed restarts.
-- **`improvement_rounds`** (default `24`) — upper bound on
+- **`multistart_runs`** — number of perturbed restarts.
+- **`improvement_rounds`** — upper bound on
   bin-elimination passes per successful restart. The pass breaks early
   once it can no longer eliminate any bin.
 - **`seed`** — optional `u64` for reproducible output.
@@ -105,10 +105,9 @@ piece the best shot at finding a tight slot.
 ## When to use it
 
 - When you want **better packing than FFD / BFD** without paying the
-  setup cost of the exact backend — typical improvements over BFD are 1–5
-  bins per hundred on mixed workloads.
+  setup cost of the exact backend. Measure gains on the target workload.
 - When you want **reproducible nondeterminism** — pass a `seed` and you
-  get the same output forever, but different seeds can recover different
+  get reproducible output within the same backend/toolchain, but different seeds can recover different
   local optima that a pure-greedy approach would miss.
 - On **moderately large instances** (100–10,000 pieces). The algorithm
   scales smoothly with `multistart_runs` so you can tune the time budget.
@@ -143,3 +142,5 @@ let solution = solve_1d(
 Source: [`crates/bin-packing/src/one_d/heuristics.rs`](../../crates/bin-packing/src/one_d/heuristics.rs)
 (see `solve_local_search`, `perturb_piece_order`, `eliminate_bins`,
 `try_insert_without_opening`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

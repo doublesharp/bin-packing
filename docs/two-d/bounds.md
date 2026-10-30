@@ -43,3 +43,5 @@ Blade gaps and inventory caps are relaxed, so the bound does not establish that
 the available stock can fulfill the order. Equality with a feasible solution
 certifies only minimum sheet count; leftover quality and cost need their own
 proof.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

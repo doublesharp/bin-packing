@@ -67,14 +67,13 @@ The returned `OneDSolution.metrics.iterations` is always `1`. The
 
 - As a **fast deterministic baseline** for sanity-checking other solvers.
 - When you need **stable output** across runs with no `seed` wiring
-  required and don't care about squeezing the last 1–3% out of the bin
-  count.
+  required and accept a heuristic bar count.
 - As the **warm start** for local search — in the default Auto mode,
   `local_search` seeds from both FFD and BFD.
 - On very large instances (`n > 10_000`) where even O(n²) is borderline,
   consider calling FFD directly rather than letting Auto run the full
-  ensemble. FFD's worst-case approximation ratio against the optimal bin
-  count is `11/9 · OPT + 6/9`, which is often close enough in practice.
+  ensemble. Classical approximation guarantees for identical, uncapped bins
+  must not be applied to arbitrary mixed-stock, kerf, trim or finite-inventory jobs.
 
 ## When to avoid it
 
@@ -101,3 +100,5 @@ let solution = solve_1d(
 
 Source: [`crates/bin-packing/src/one_d/heuristics.rs`](../../crates/bin-packing/src/one_d/heuristics.rs)
 (see `solve_ffd`, `pack_ordered`, `choose_existing_bin`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

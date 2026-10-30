@@ -19,15 +19,13 @@ bindings.
   [`napi-rs`](https://napi.rs/).
 - WebAssembly bindings: [bindings/wasm](bindings/wasm/) — published to npm as
   `@0xdoublesharp/bin-packing-wasm`, powered by
-  [`wasm-bindgen`](https://rustwasm.github.io/wasm-bindgen/). Runs in
-  browsers, Node.js, Deno, Bun, and Cloudflare Workers.
+  [`wasm-bindgen`](https://rustwasm.github.io/wasm-bindgen/). Targets browsers and Node.js; other WASM hosts may need loader configuration.
 - Fuzz targets: [fuzz/](fuzz/) — libFuzzer harnesses for the 1D, 2D, and 3D
   entry points.
 
 ## Features
 
-See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for the new physical
-models, optimization APIs and compatibility notes. The
+See the [v0.6.0 release notes](docs/releases/v0.6.0.md) for changes and compatibility notes. The
 [testing guide](docs/testing-confidence.md) explains validation and coverage.
 
 ### Native geometry, physical rules and explicit objectives
@@ -60,8 +58,9 @@ limits. Independent validators check source identity and physical results.
 - **Multi-objective ranking.** Solutions are compared lexicographically by
   `(unplaced, stock_count, total_waste, total_cost, !exact)` so better
   heuristic candidates win automatically in `Auto` mode.
-- **Lower bounds.** The column-generation backend reports an LP lower bound
-  and marks the solution `exact = true` when it matches the incumbent.
+- **Lower bounds.** The column-generation backend reports a certified LP or conservative length bound
+  and marks the solution `exact = true` when full pattern enumeration and
+  integer search establish the optimum.
 - **Structured errors.** Public boundary validation fails fast with typed
   `BinPackingError` variants instead of panics.
 
@@ -80,7 +79,7 @@ limits. Independent validators check source identity and physical results.
   FFD/BFD, Multi-start, GRASP, and Local Search meta-strategies, plus a
   restricted Martello-Pisinger-Vigo branch-and-bound exact backend.
 - **Same ranking contract.** Solutions are compared lexicographically by
-  `(unplaced, bin_count, total_waste_volume, total_cost, !exact)`, so
+  `(unplaced, bin_count, total_waste_volume, total_cost)`, so
   `Auto` mode always returns the best candidate.
 - **Dimension safety.** Per-axis dimensions are capped at `1 << 15`
   (`MAX_DIMENSION_3D`) so that `w × h × d` never overflows `u64`.
@@ -134,22 +133,12 @@ chosen shop cost model. The solver is not re-run.
 
 **Entry points:**
 
-- `bin_packing::one_d::cut_plan::plan_cuts(&solution, &options) -> Result<CutPlanSolution1D, CutPlanError>`
+- `bin_packing::one_d::cut_plan::plan_cuts(&problem, &solution, &options) -> Result<CutPlanSolution1D, CutPlanError>`
 - `bin_packing::two_d::cut_plan::plan_cuts(&solution, &options) -> Result<CutPlanSolution2D, CutPlanError>`
 
-**Presets (1D):**
-
-| Preset | `cut_cost` | `fence_reset_cost` |
-| --- | --- | --- |
-| `ChopSaw` | 1.0 | 0.3 |
-
-**Presets (2D):**
-
-| Preset | `cut_cost` | `rotate_cost` | `fence_reset_cost` | `tool_up_down_cost` | `travel_cost` |
-| --- | --- | --- | --- | --- | --- |
-| `TableSaw` | 1.0 | 2.0 | 0.5 | — | — |
-| `PanelSaw` | 1.0 | 5.0 | 0.3 | — | — |
-| `CncRouter` | 1.0 | — | — | 0.2 | 0.01 |
+**Presets:** `ChopSaw` in 1D; `TableSaw`, `PanelSaw` and `CncRouter` in 2D.
+The [generated preset costs](docs/reference.md#cutplanpresetcosts) are resolved
+by the actual planning APIs and checked before publication.
 
 Any cost field on the options struct overrides the preset default. Pass
 `..CutPlanOptions2D::default()` to accept all preset defaults.
@@ -195,6 +184,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cost: 1.0,
             quantity: None,
             kerf: 2,
+            edge_kerf_relief: false,
         }],
         demands: vec![
             RectDemand2D { name: "panel-a".into(), width: 24, height: 18, quantity: 4, can_rotate: true },
@@ -202,7 +192,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     };
 
-    let solution = solve_2d(problem, TwoDOptions { algorithm: TwoDAlgorithm::Auto, ..Default::default() })?;
+    let solution = solve_2d(problem, TwoDOptions { algorithm: TwoDAlgorithm::Auto, guillotine_required: true, ..Default::default() })?;
 
     let cut_plan = plan_cuts(
         &solution,
@@ -310,11 +300,11 @@ Meta-strategies:
 | `multi_start` | Randomized EP meta-strategy. Runs `multistart_runs` restarts with shuffled item orderings under `seed`. |
 | `grasp` | Greedy Randomized Adaptive Search: RCL-based randomized construction (top-30% by volume) followed by local search improvement. |
 | `local_search` | Standalone local search seeded from FFD volume. Explores move/rotate/swap neighbourhood with bin-elimination repair. |
-| `branch_and_bound` | Restricted Martello-Pisinger-Vigo exact backend. Computes L0/L1/L2 lower bounds; returns `Unsupported` for multi-bin-type, capped, or rotation-constrained inputs. |
+| `branch_and_bound` | Restricted Martello-Pisinger-Vigo exact backend. Computes conservative-scale lower bounds; returns `Unsupported` for multi-bin-type, capped, or rotatable (non-`XYZ`) inputs. |
 | `auto` *(default)* | Tiered sweep: tier-1 runs ExtremePoints (3 variants), Guillotine3D, LayerBuilding, and FFD; tier-2 (when `multistart_runs > 0`) adds MultiStart and LocalSearch. Returns the best result. |
 
 Solution ranking for 3D is lexicographic on
-`(unplaced, bin_count, total_waste_volume, total_cost, !exact)`.
+`(unplaced, bin_count, total_waste_volume, total_cost)`.
 
 ### 1D (`OneDAlgorithm`)
 
@@ -324,7 +314,7 @@ Solution ranking for 3D is lexicographic on
 | `first_fit_decreasing` | Classic FFD: sort cuts by length descending, place each into the first open bin that fits, open a new bin otherwise. O(n²) deterministic. |
 | `best_fit_decreasing` | BFD: place each sorted cut into the open bin with the tightest fit. Typically uses fewer bins than FFD on mixed sizes. |
 | `local_search` | Multistart local search seeded from FFD/BFD, with bin-elimination repair. `multistart_runs` restarts × `improvement_rounds` swap/move rounds, driven by `seed`. |
-| `column_generation` | Exact backend: generates cutting patterns via price-and-solve, refines with pattern search, and enumerates up to `exact_pattern_limit` patterns per iteration for `column_generation_rounds` rounds. Reports an LP lower bound and sets `exact = true` when the bound is matched. |
+| `column_generation` | Exact backend: generates cutting patterns via price-and-solve, refines with pattern search, and runs one capped enumeration pass after at most `column_generation_rounds` LP/pricing rounds. Reports a certified LP or conservative volume lower bound; `exact = true` requires complete pattern enumeration and integer search. |
 
 ### 2D (`TwoDAlgorithm`)
 
@@ -390,12 +380,14 @@ already guillotine-compatible.
 
 Add the crate to your `Cargo.toml`:
 
+<!-- BEGIN GENERATED: dependency -->
 ```toml
 [dependencies]
-bin-packing = "0.3"
+bin-packing = "0.6.0"
 ```
+<!-- END GENERATED: dependency -->
 
-The dimension modules expose three entry points:
+The regular dimension modules expose these primary entry points:
 
 - `one_d::solve_1d(problem, options) -> Result<OneDSolution>`
 - `two_d::solve_2d(problem, options) -> Result<TwoDSolution>`
@@ -404,7 +396,10 @@ The dimension modules expose three entry points:
 All problem and solution types implement `serde::Serialize` /
 `serde::Deserialize`, so the same models are usable from Rust code or
 wire-format APIs. The crate root re-exports `BinPackingError` and `Result`;
-everything else comes from the `one_d`, `two_d`, and `three_d` modules.
+the regular models come from `one_d`, `two_d`, and `three_d`. The `irregular`
+module adds shape nesting; `optimization` supplies shared objective controls.
+See the [generated reference](docs/reference.md) for features, defaults and
+binding exports, and the [API guide](docs/bindings.md) for the added models.
 
 ### 1D cutting stock
 
@@ -475,21 +470,20 @@ fn main() -> bin_packing::Result<()> {
 - `available`: optional inventory cap (number of pieces of this type that
   may be used).
 
-`OneDOptions` fields:
+`OneDOptions` fields (effective defaults are in the
+[generated reference](docs/reference.md#onedoptions)):
 
 - `algorithm`: `auto` *(default)*, `first_fit_decreasing`,
   `best_fit_decreasing`, `local_search`, or `column_generation`.
-- `multistart_runs`: number of restarts for local search (default `16`).
-- `improvement_rounds`: improvement passes per local-search start (default
-  `24`).
-- `column_generation_rounds`: outer rounds for the exact backend (default
-  `32`).
-- `exact_pattern_limit`: maximum patterns enumerated per round in the exact
-  backend (default `25_000`).
+- `multistart_runs`: number of restarts for local search.
+- `improvement_rounds`: improvement passes per local-search start.
+- `column_generation_rounds`: LP/pricing rounds before one pattern-enumeration pass.
+- `exact_pattern_limit`: cap on the single exhaustive enumeration pass in the
+  exact backend; hitting it discards that batch and leaves the result non-exact.
 - `auto_exact_max_types`: maximum distinct demand types for `Auto` mode to
-  attempt the exact backend (default `14`).
+  attempt the exact backend.
 - `auto_exact_max_quantity`: maximum total demand quantity for `Auto` mode
-  to attempt the exact backend (default `96`).
+  to attempt the exact backend.
 - `seed`: optional RNG seed for reproducible randomized algorithms.
 
 `OneDSolution` fields of interest:
@@ -522,6 +516,7 @@ fn main() -> bin_packing::Result<()> {
             cost: 1.0,
             quantity: None,
             kerf: 2,
+            edge_kerf_relief: false,
         }],
         demands: vec![
             RectDemand2D {
@@ -585,12 +580,12 @@ fn main() -> bin_packing::Result<()> {
 - `cost`: per-unit cost of consuming one sheet of this type.
 - `quantity`: optional cap on the number of sheets of this type that may be
   used.
-- `kerf`: optional saw-blade kerf width (default `0`). The solver enforces
+- `kerf`: optional saw-blade kerf width. The solver enforces
   this gap between every pair of adjacent placements on the sheet; the gap
   between a placement and the sheet edge is free (factory edge rule).
 - `edge_kerf_relief`: when `true`, the trailing placement on the sheet
   may extend up to one `kerf` past the sheet's right and bottom edges,
-  modeling a cut that exits the stock (default `false`). Individual parts
+  modeling a cut that exits the stock. Individual parts
   must still fit within the sheet's declared dimensions.
 
 `RectDemand2D` fields:
@@ -599,21 +594,22 @@ fn main() -> bin_packing::Result<()> {
 - `quantity`: number of identical rectangles required.
 - `can_rotate`: whether the solver may rotate this rectangle 90°.
 
-`TwoDOptions` fields:
+`TwoDOptions` fields (effective defaults are in the
+[generated reference](docs/reference.md#twodoptions)):
 
 - `algorithm`: see the 2D algorithm table above; defaults to `auto`.
 - `multistart_runs`: number of restarts for the multistart meta-strategy.
 - `beam_width`: beam width for the guillotine beam search backend.
-- `guillotine_required`: when `true`, forces guillotine-compatible layouts
-  and restricts `auto` to guillotine variants.
+- `guillotine_required`: filters `auto` to guillotine variants. It does not
+  override an explicitly selected algorithm.
 - `min_usable_side`: minimum side length (in the same units as sheet
-  dimensions) for a leftover drop to count as usable (default `0` — all
-  drops count). Raise this to ignore narrow strips that are too small to
+  dimensions) for a leftover drop to count as usable. A zero threshold counts
+  all nonzero drops. Raise this to ignore narrow strips that are too small to
   reuse; the consolidation tiebreakers then favour solutions that leave
   fewer but larger reusable offcuts.
 - `auto_rotation_search_max_types`: maximum number of rotatable demand types
-  for which rotation search uses exhaustive enumeration (default `16`). When
-  the number of rotatable types exceeds this threshold, rotation search
+  for which rotation search uses exhaustive enumeration, subject to a hard
+  ceiling of 16. Above the smaller of this threshold and 16, rotation search
   switches to sampling `multistart_runs` random assignments.
 - `seed`: optional RNG seed for reproducible randomized algorithms.
 
@@ -726,16 +722,19 @@ fn main() -> bin_packing::Result<()> {
   from the per-rotation constants (`RotationMask3D::XYZ`, `XZY`, `YXZ`, `YZX`,
   `ZXY`, `ZYX`).
 
-`ThreeDOptions` fields:
+`ThreeDOptions` fields (effective defaults are in the
+[generated reference](docs/reference.md#threedoptions)):
 
 - `algorithm`: see the 3D algorithm table above; defaults to `auto`.
 - `multistart_runs`: number of restarts for randomized meta-strategies.
 - `improvement_rounds`: improvement passes per local-search or GRASP start.
 - `beam_width`: beam width for the Guillotine 3D beam search backend.
 - `seed`: optional RNG seed for reproducible randomized algorithms.
-- `auto_exact_max_types` / `auto_exact_max_quantity`: thresholds controlling
-  when `Auto` mode may escalate to the exact branch-and-bound backend.
+- `auto_exact_max_types` / `auto_exact_max_quantity`: reserved for compatibility; 3D Auto does not use these fields. Select
+  `branch_and_bound` explicitly to request the restricted exact backend.
 - `branch_and_bound_node_limit`: maximum nodes the exact backend may expand.
+- `guillotine_required`: filters Auto to its guillotine-compatible ensemble;
+  it does not override an explicitly selected algorithm.
 
 `ThreeDSolution` fields of interest:
 
@@ -763,6 +762,9 @@ fn main() -> bin_packing::Result<()> {
   declared sheet, even with rotation.
 - `Infeasible3D { item, width, height, depth }` — a 3D demand does not fit
   any declared bin in any allowed rotation.
+- `InvalidConstraint { field, reason }` — a physical/objective request or its
+  controls exceed a supported rule or bound.
+- `InvalidSolution { reason }` — independent readback found inconsistent output.
 - `Unsupported(String)` — the exact backend encountered a configuration it
   does not currently handle (for example, multi-stock input or capped
   inventory for column generation), or an internal invariant violation was
@@ -780,7 +782,9 @@ pnpm run build
 Then call the wrapper with plain JavaScript objects. Field names match the
 Rust `serde` representation (`snake_case`):
 
+<!-- bin-packing:example -->
 ```js
+const assert = require('node:assert/strict');
 const binPacking = require('@0xdoublesharp/bin-packing');
 
 const cutList = binPacking.solve1d(
@@ -821,6 +825,11 @@ const packing = binPacking.solve3d(
   { algorithm: 'auto', seed: 42 }
 );
 
+assert.equal(cutList.unplaced.length, 0);
+assert.equal(layout.unplaced.length, 0);
+assert.equal(layout.guillotine, true);
+assert.equal(packing.unplaced.length, 0);
+assert.equal(packing.layouts.flatMap(bin => bin.placements).length, 14);
 console.log(packing.bin_count, packing.total_waste_volume);
 ```
 
@@ -831,8 +840,7 @@ TypeScript type definitions ship alongside the JavaScript wrapper in
 
 ## Browser / WASM usage
 
-For browsers, Deno, Bun, and Cloudflare Workers (or anywhere else a native
-Node addon is inconvenient), the WebAssembly binding at [bindings/wasm](bindings/wasm/)
+For browsers and Node.js environments where a native addon is inconvenient, the WebAssembly binding at [bindings/wasm](bindings/wasm/)
 publishes to npm as `@0xdoublesharp/bin-packing-wasm`. It ships combined and
 dimension-specific targets through a single package:
 
@@ -850,18 +858,19 @@ import { solve2d as solveSheets } from '@0xdoublesharp/bin-packing-wasm/two-d';
 import { solve3d as packBoxes } from '@0xdoublesharp/bin-packing-wasm/three-d';
 
 // Raw ES modules / Deno — explicit init required
-import init, { solve2d } from '@0xdoublesharp/bin-packing-wasm/web';
+import init, { solve2d as solveWebSheets } from '@0xdoublesharp/bin-packing-wasm/web';
 await init();
 
 // Node.js / Bun — synchronous load, no init
-import { solve1d } from '@0xdoublesharp/bin-packing-wasm/nodejs';
+import { solve1d as solveNodeCuts } from '@0xdoublesharp/bin-packing-wasm/nodejs';
 ```
 
 The API is identical to the Node binding: plain JS objects go in, plain JS
 objects come out, and errors throw native JavaScript exceptions with the
-original `BinPackingError` message. Full TypeScript types are included. The
-combined output is ~550 KB of `wasm-opt -Oz`-optimized WebAssembly (1D+2D+3D); the
-dimension-specific browser outputs are currently ~200 KB for 1D, ~230 KB for 2D, and ~300 KB for 3D. These are approximate — run the build locally for current figures.
+original `BinPackingError` message. Full TypeScript types are included. Combined builds include irregular nesting.
+Use a dimension-specific import to reduce payload size. The
+[dated expansion report](docs/experiments/2026-10-28-packingsolver-completion.md)
+records measured sizes; a fresh build is required for current sizes.
 
 Build it locally:
 
@@ -882,7 +891,10 @@ reference and per-target usage examples.
 crates/bin-packing/          # core solver crate
   src/one_d/                 #   1D model, heuristics, and exact backend
   src/two_d/                 #   2D model, MaxRects, Skyline, Guillotine, Shelf, RotationSearch
-  src/three_d/               #   3D model, 29-algorithm catalog
+  src/three_d/               #   3D model, loading and objective solvers
+  src/irregular/             #   polygon/curve nesting and independent validation
+  src/optimization.rs        #   public shared objective controls
+  src/optimization/          #   shared bounded objective search
   benches/solver_benches.rs  #   Criterion benchmarks (1D + 2D + 3D)
   tests/solver_regressions.rs
 bindings/node/               # napi-rs Node.js bindings (@0xdoublesharp/bin-packing)
@@ -908,7 +920,11 @@ Full Rust/doc/text/TOML quality gate (matches CI):
 See [correctness checks and production coverage](docs/testing-confidence.md) for
 independent oracle tests and the repeatable line/branch coverage command.
 
-Equivalent individual commands:
+The gate also checks generated docs, local documentation links and runnable
+Rust examples. Refresh source-derived facts with `python3 -B scripts/check-docs.py
+--write`; see [documentation maintenance](docs/documentation.md).
+
+Individual Rust/text/TOML commands (the script also runs Python and docs checks):
 
 ```sh
 cargo fmt --all --check
@@ -916,6 +932,7 @@ taplo fmt --check
 typos
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --all-features --locked
+cargo test -p bin-packing --doc --all-features --locked
 cargo doc --manifest-path crates/bin-packing/Cargo.toml --locked --no-deps --document-private-items
 ```
 
@@ -955,6 +972,11 @@ seeded counterexample finder. `scripts/check-bindings.sh` rebuilds and checks bo
 packages; `scripts/check-features.sh` includes the separate fuzz project.
 
 For local builds on a separate disposable volume, see [Scratch build storage](docs/scratch-builds.md).
+
+## Publishing
+
+See the [release runbook](docs/releasing.md) for version synchronization,
+documentation checks, package verification, tag publication and readback.
 
 ## Contributing and community
 

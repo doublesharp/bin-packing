@@ -29,9 +29,8 @@ vector contains one line:
 
 FFD commits to the first bin that *fits*. BFD commits to the bin that fits
 *tightest*. In the expected case where many bins are partially filled, BFD
-closes bins faster and opens fewer new ones. On a classic cutting-stock
-workload with mixed sizes close to half-capacity, BFD typically beats FFD
-by 1–3 bins per hundred. On highly uniform workloads (everything is the
+closes bins faster and opens fewer new ones. Its result relative to FFD depends on the workload; neither heuristic
+is a general guarantee of fewer bars. On highly uniform workloads (everything is the
 same size) they produce identical output because every fit is equally
 tight.
 
@@ -91,3 +90,5 @@ let solution = solve_1d(
 Source: [`crates/bin-packing/src/one_d/heuristics.rs`](../../crates/bin-packing/src/one_d/heuristics.rs)
 (see `solve_bfd`, `pack_ordered`, `choose_existing_bin` — the
 `PlacementStrategy::BestFit` arm is what distinguishes BFD from FFD).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

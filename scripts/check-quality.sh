@@ -38,6 +38,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests
 cargo fmt --all --check
 taplo fmt --check
 typos
+python3 -B scripts/check-docs.py --rust-examples
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --all-features --locked
+cargo test -p bin-packing --doc --all-features --locked
 cargo doc --manifest-path crates/bin-packing/Cargo.toml --locked --no-deps --document-private-items

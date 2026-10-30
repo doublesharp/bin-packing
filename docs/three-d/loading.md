@@ -142,3 +142,5 @@ validate_loading_3d(&loading, &solution)?;
 # Ok(())
 # }
 ```
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

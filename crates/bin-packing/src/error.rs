@@ -4,7 +4,7 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum BinPackingError {
-    /// The problem failed input validation (e.g. empty demand list, zero dimension, invalid cost).
+    /// The problem failed input validation (e.g. empty stock list, zero dimension, invalid cost).
     #[error("invalid input: {0}")]
     InvalidInput(String),
     /// A constrained solver received a malformed constraint or search control.

@@ -88,3 +88,5 @@ let solution = solve_3d(
 Source: [`crates/bin-packing/src/three_d/multi_start.rs`](../../crates/bin-packing/src/three_d/multi_start.rs),
 [`crates/bin-packing/src/three_d/grasp.rs`](../../crates/bin-packing/src/three_d/grasp.rs),
 and [`crates/bin-packing/src/three_d/local_search.rs`](../../crates/bin-packing/src/three_d/local_search.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

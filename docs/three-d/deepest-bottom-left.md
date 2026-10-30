@@ -81,3 +81,5 @@ let solution = solve_3d(
 ```
 
 Source: [`crates/bin-packing/src/three_d/dblf.rs`](../../crates/bin-packing/src/three_d/dblf.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

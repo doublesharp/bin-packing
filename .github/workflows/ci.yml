@@ -18,6 +18,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DOCS_PLAYWRIGHT_VERSION: "1.56.1"
+  DOCS_TYPESCRIPT_VERSION: "5.9.3"
   NODE_VERSION: "22"
 
 jobs:
@@ -84,6 +86,9 @@ jobs:
       - name: Test packed native package
         run: node bindings/test/package-native.cjs
 
+      - name: Run native documentation examples
+        run: node bindings/test/docs-examples.cjs native
+
   wasm:
     name: WebAssembly package
     runs-on: ubuntu-latest
@@ -118,6 +123,27 @@ jobs:
 
       - name: Test packed WASM entry points
         run: node bindings/test/package-wasm.mjs
+
+      - name: Run WASM documentation examples
+        run: node bindings/test/docs-examples.cjs wasm
+
+      - name: Build native package for cross-backend contracts
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.25.0 --activate
+          pnpm --dir bindings/node install --frozen-lockfile
+          pnpm --dir bindings/node run build
+
+      - name: Install declaration and browser test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/bin-packing-doc-tools" --no-audit --no-fund --no-package-lock "typescript@$DOCS_TYPESCRIPT_VERSION" "playwright@$DOCS_PLAYWRIGHT_VERSION"
+          node "$RUNNER_TEMP/bin-packing-doc-tools/node_modules/playwright/cli.js" install --with-deps chromium --only-shell
+
+      - name: Verify declarations, generated cases and browser APIs
+        run: |
+          node bindings/test/package-types.mjs "$RUNNER_TEMP/bin-packing-doc-tools/node_modules/typescript/lib/tsc.js"
+          node bindings/test/solver-finder.cjs --cases 300
+          node bindings/test/package-browser.cjs "$RUNNER_TEMP/bin-packing-doc-tools/node_modules/playwright"
 
       - name: Upload tested WASM package
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'

@@ -101,7 +101,7 @@ This can help when later large boxes need contiguous free volume.
 
 ## Beam width
 
-`ThreeDOptions.beam_width` defaults to `8`. At `beam_width = 1`, the family
+See the [generated beam-width default](../reference.md#threedoptions). At `beam_width = 1`, the family
 acts like a greedy search over the current best child. Larger values explore
 more alternatives at roughly linear additional memory and time cost.
 
@@ -133,3 +133,5 @@ assert!(solution.guillotine);
 ```
 
 Source: [`crates/bin-packing/src/three_d/guillotine.rs`](../../crates/bin-packing/src/three_d/guillotine.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

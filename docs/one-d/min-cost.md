@@ -31,3 +31,5 @@ Fractional material costs disable numerical memoization, preserving the exact
 public floating-point comparison rather than rounding prices. Small mixed-stock,
 kerf, trim and inventory problems are checked against an independent per-piece
 assignment oracle, including fractional prices and partial fulfillment.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

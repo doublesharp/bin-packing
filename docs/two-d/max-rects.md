@@ -238,3 +238,5 @@ Source: [`crates/bin-packing/src/two_d/maxrects.rs`](../../crates/bin-packing/sr
 `solve_maxrects_bottom_left`, `solve_maxrects_contact_point`,
 `MaxRectsStrategy::compare`, `split_free_rect`, `prune_contained_rects`,
 `contact_score`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

@@ -129,3 +129,5 @@ let solution = solve_3d(
 ```
 
 Source: [`crates/bin-packing/src/three_d/extreme_points.rs`](../../crates/bin-packing/src/three_d/extreme_points.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

@@ -33,3 +33,5 @@ The budget counts whole algorithm calls. It is neither a wall-clock deadline
 nor a bound on the work inside a candidate. Validation and bound calculation
 precede the ensemble. No count certificate is returned for a partial packing,
 including when inventory prevents fulfilling the order.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

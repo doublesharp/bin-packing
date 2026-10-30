@@ -25,7 +25,8 @@ normalized internally. Source material area uses analytic line/arc integration;
 holes subtract material area.
 
 Source rings must be simple and nondegenerate. Hole interiors must lie within
-their component and cannot overlap other holes. Components cannot overlap.
+their component with strictly positive exterior clearance and cannot overlap
+other holes. A hole touching its exterior at one point or along an edge is invalid. Components cannot overlap.
 Line/arc self-intersections, including overlapping circular arcs, are checked
 before polygon offset operations. Nonfinite coordinates, mismatched arc radii,
 invalid topology, and excessive geometry return structured `InvalidConstraint`

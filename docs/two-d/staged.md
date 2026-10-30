@@ -122,3 +122,5 @@ Fixtures cover a full-area pattern needing three stages instead of two, a
 binding first axis, differing cut policies, kerf and defect cut-through,
 per-side trims, distances and cut counts, ordered groups, duplicate labels,
 cost/count selection, zero and tiny budgets, serialization and corrupted trees.
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

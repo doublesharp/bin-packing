@@ -27,6 +27,16 @@ algorithm is chosen via `OneDOptions.algorithm`.
    search, then optionally escalates to column generation when the instance
    is small enough. Returns the best candidate under the 1D comparator.
 
+## Additional entry points
+
+- [Compressed arc-flow search](arc-flow.md): mixed stock, inventory and bounded
+  pattern search through `solve_1d_arc_flow` (Rust only).
+- [Minimum material cost](min-cost.md): `solve_1d_min_cost` / `solve1dMinCost`.
+- [Explicit objectives](../objectives.md): `optimization::solve_1d_optimized` /
+  `solve1dOptimized`, including profit, mandatory quantities and open length.
+
+The [generated reference](../reference.md) records effective default options.
+
 ## Problem shape
 
 A 1D problem is a list of `Stock1D` entries and a list of `CutDemand1D`
@@ -127,9 +137,9 @@ reused by every algorithm that picks among its own candidates.
 
 ## Cut plans
 
-After solving, call `bin_packing::one_d::cut_plan::plan_cuts(&solution, &options)`
+After solving, call `bin_packing::one_d::cut_plan::plan_cuts(&problem, &solution, &options)`
 to generate an ordered cut sequence for every bar in the solution. The planner is a
-pure post-processor — it reads the finished layout and emits steps without
+pure post-processor — it reads the original stock kerf and finished layout and emits steps without
 re-running the solver.
 
 ### 1D cut sequencing
@@ -139,12 +149,14 @@ For each `BarCutPlan1D` the planner emits:
 1. **`CutStep1D::FenceReset { new_position }`** — emitted before the first cut
    on a bar, and again whenever the cut length changes from the previous cut
    (i.e., the fence stop must move to a new position).
-2. **`CutStep1D::Cut { position, piece_name }`** — one entry per placed cut,
+2. **`CutStep1D::Cut { position, piece_name }`** — one entry per required separation,
    ordered left-to-right along the bar (consuming the bar from one end).
 
-Cut positions are read directly from the layout's placement coordinates; kerf is
-already baked into those positions and requires no additional arithmetic in the
-planner.
+Cut positions accumulate each cut length and the original stock kerf. The
+problem is required because `StockLayout1D` does not carry the stock kerf.
+The final cut is omitted when the last piece exactly exhausts usable stock.
+This is a legacy sequence/cost model,
+not the workpiece-aware 2D physical planner.
 
 Fence resets are only emitted when the cut length *changes*. A run of identical
 cuts (e.g., four rails of the same length from one bar) produces a single fence
@@ -155,8 +167,8 @@ reset followed by four cut steps — not four resets.
 
 ### `ChopSaw` preset
 
-The only 1D preset. Default costs: `cut_cost = 1.0`, `fence_reset_cost = 0.3`.
-Override either field by setting it explicitly in `CutPlanOptions1D`.
+The only 1D preset. See [generated preset costs](../reference.md#cutplanpresetcosts).
+Override either cost field by setting it explicitly in `CutPlanOptions1D`.
 
 ### Output shape
 
@@ -187,8 +199,10 @@ no layout-shape constraint.
 
 ## Reproducibility
 
-Local search is the only 1D algorithm that consults `OneDOptions.seed`.
+Local search and entry points that use it for an incumbent consult `OneDOptions.seed`.
 When `seed = None`, it falls back to the fixed constant
 `0x4249_4E50_4143_4B30` (ASCII `"BINPACK0"`), so runs are still
-reproducible across processes. FFD, BFD, and column generation are fully
-deterministic in the input order regardless of `seed`.
+reproducible across processes. FFD and BFD are deterministic in input order. Column generation uses a local-
+search incumbent and can therefore depend on the seed when its pattern search
+is incomplete. Randomized output is reproducible within the same backend and
+toolchain; native and WASM use different `SmallRng` implementations.

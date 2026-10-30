@@ -25,7 +25,7 @@ When `ThreeDOptions.multistart_runs > 0`, Auto also runs:
 7. [`multi_start`](meta-strategies.md#multi_start)
 8. [`local_search`](meta-strategies.md#local_search)
 
-The default `multistart_runs` is `12`, so tier 2 is enabled by default.
+Tier 2 is enabled by the [generated defaults](../reference.md#threedoptions).
 Setting `multistart_runs = 0` disables these meta-strategies and keeps Auto to
 the six tier-1 constructions.
 
@@ -103,3 +103,5 @@ assert!(solution.guillotine);
 ```
 
 Source: [`crates/bin-packing/src/three_d/auto.rs`](../../crates/bin-packing/src/three_d/auto.rs).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).

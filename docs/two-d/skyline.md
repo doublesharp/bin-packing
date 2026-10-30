@@ -195,3 +195,5 @@ Both variants are valid:
 Source: [`crates/bin-packing/src/two_d/skyline.rs`](../../crates/bin-packing/src/two_d/skyline.rs)
 (see `solve_skyline`, `solve_skyline_min_waste`, `SkylineStrategy::compare`,
 `skyline_fit`, `add_skyline_level`, `merge_nodes`).
+
+Effective option defaults are recorded in the [generated reference](../reference.md).
